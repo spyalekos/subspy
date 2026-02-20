@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "export_date": "2026-01-11T13:50:00.762780",
+  "subscriptions": [
+    {
+      "id": 1,
+      "description": "Google Antigravity One",
+      "charge_date": "2026-01-16",
+      "amount": 23.99,
+      "repeat_days": 30,
+      "category": "Τεχνητή Νοημοσύνη"
+    },
+    {
+      "id": 2,
+      "description": "Skroutz Plus",
+      "charge_date": "2026-01-17",
+      "amount": 20.0,
+      "repeat_days": 365,
+      "category": "Συνδρομές"
+    },
+    {
+      "id": 3,
+      "description": "Κινητό 6944303444",
+      "charge_date": "2026-02-09",
+      "amount": 13.0,
+      "repeat_days": 30,
+      "category": "Τηλεφωνία"
+    },
+    {
+      "id": 4,
+      "description": "Κινητό Data+GSIS",
+      "charge_date": "2026-03-05",
+      "amount": 16.36,
+      "repeat_days": 0,
+      "category": "Τηλεφωνία"
+    }
+  ]
+}
