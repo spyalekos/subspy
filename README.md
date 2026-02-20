@@ -1,117 +1,140 @@
-# SubsPy - Εφαρμογή Διαχείρισης Εσόδων & Εξόδων
+# SubsPy - Διαχείριση Εσόδων & Εξόδων
 
-Μια cross-platform εφαρμογή για τη διαχείριση εσόδων και εξόδων, κατασκευασμένη με Python και Flet.
+<p align="center">
+  <img src="src/assets/icon.png" alt="SubsPy Logo" width="120"/>
+</p>
+
+Εφαρμογή διαχείρισης εσόδων και εξόδων, κατασκευασμένη με **Python** και **Flet**.
+Τρέχει σε Windows, macOS, Linux, Raspberry Pi και Android.
 
 ## Χαρακτηριστικά
 
-- 📋 **Διαχείριση Εσόδων/Εξόδων** — Προσθήκη, επεξεργασία και διαγραφή καταχωρήσεων
-- 📅 **Επαναλαμβανόμενες Κινήσεις** — Υποστήριξη για μη-επαναλαμβανόμενες και επαναλαμβανόμενες (π.χ. συνδρομές, μισθοί)
-- 📊 **Προοδευτικές Αναφορές** — Υπολογισμός χρεώσεων για οποιοδήποτε χρονικό διάστημα
-- 📄 **Εξαγωγή PDF** — Δημιουργία PDF αναφορών με έγχρωμη διάκριση εσόδων/εξόδων
-- 🏷️ **Κατηγοριοποίηση** — Οργάνωση με προσαρμοσμένες κατηγορίες
-- 💾 **Εξαγωγή/Εισαγωγή** — Backup και επαναφορά δεδομένων σε JSON
-- 🌍 **Ελληνική Γλώσσα** — Πλήρης υποστήριξη ελληνικών
-- 🖥️ **Cross-Platform** — Windows, macOS, Linux, Raspberry Pi, Android
+- 📋 **Καταχωρήσεις** — Προσθήκη, επεξεργασία και διαγραφή εσόδων/εξόδων
+- 📅 **Επαναλαμβανόμενες κινήσεις** — Συνδρομές, μισθοί και άλλες περιοδικές κινήσεις (π.χ. κάθε 30 ημέρες)
+- 📊 **Αναφορές** — Προοδευτικές χρεώσεις για οποιοδήποτε χρονικό διάστημα
+- 📄 **Εξαγωγή PDF** — Αναφορά σε PDF με έγχρωμη διάκριση (πράσινο = έσοδα, κόκκινο = έξοδα)
+- 🏷️ **Κατηγορίες** — Οργάνωση κινήσεων σε προσαρμοσμένες κατηγορίες
+- 💾 **Backup/Restore** — Εξαγωγή και εισαγωγή δεδομένων σε JSON
+- 🌍 **Ελληνικά** — Πλήρες ελληνικό UI (μενού, DatePickers, μηνύματα)
+- 🖥️ **Cross-platform** — Windows, macOS, Linux, Raspberry Pi, Android
 
-## Εγκατάσταση
+## Γρήγορη εκκίνηση
 
 ### Απαιτήσεις
 - Python 3.10+
 
-### Εγκατάσταση εξαρτήσεων
+### Εγκατάσταση
 
 ```bash
+# Κλωνοποίηση
+git clone https://github.com/spyalekos/subspy.git
+cd subspy
+
 # Δημιουργία virtual environment
 python3 -m venv .venv
 source .venv/bin/activate    # Linux/Mac
 # .venv\Scripts\activate     # Windows
 
+# Εγκατάσταση εξαρτήσεων
 pip install flet reportlab
 ```
 
 ### Εκτέλεση
 
 ```bash
+# Με Flet CLI (hot reload)
+flet run src
+
+# Ή απευθείας
 .venv/bin/python src/main.py
 ```
 
 ## Χρήση
 
-### Καταχωρήσεις
-- Πατήστε **"Προσθήκη"** για νέα καταχώρηση (έσοδο ή έξοδο)
-- Κάντε κλικ σε μια καταχώρηση για επεξεργασία ή διαγραφή
-- **Επανάληψη 0** = μη επαναλαμβανόμενη κίνηση
+### 📋 Καταχωρήσεις
+- Πατήστε **«Προσθήκη»** για νέα εγγραφή
+- Επιλέξτε **Έσοδο** ή **Έξοδο** από τον επιλογέα
+- Ορίστε ημερομηνία, ποσό, κατηγορία και ημέρες επανάληψης
+- Πατήστε σε μια γραμμή για επεξεργασία ή διαγραφή
+- Επανάληψη `0` = μοναδική κίνηση, `30` = μηνιαία, `365` = ετήσια
 
-### Αναφορές
-1. Επιλέξτε ημερομηνίες "Από" και "Έως"
-2. Πατήστε **"Δημιουργία"** για υπολογισμό χρεώσεων
-3. Πατήστε **"Εκτύπωση PDF"** για εξαγωγή
+### 📊 Αναφορές
+1. Επιλέξτε ημερομηνίες «Από» και «Έως»
+2. Πατήστε **«Δημιουργία»** για υπολογισμό χρεώσεων
+3. Πατήστε **«Εκτύπωση PDF»** για εξαγωγή αναφοράς
 
-### Εργαλεία
-- **Εξαγωγή**: Αποθηκεύει τα δεδομένα σε JSON
-- **Εισαγωγή**: Επαναφορά δεδομένων από JSON (με FilePicker ή χειροκίνητη εισαγωγή path)
-- **Κατηγορίες**: Διαχείριση προσαρμοσμένων κατηγοριών
+### 🛠️ Εργαλεία
+- **Εξαγωγή**: Αποθηκεύει όλα τα δεδομένα σε αρχείο JSON
+- **Εισαγωγή**: Επαναφορά δεδομένων από αρχείο JSON
+- **Κατηγορίες**: Προσθήκη και διαγραφή κατηγοριών
 
-## Τεχνολογίες
-
-- **Flet 0.80+** — Cross-platform UI framework
-- **SQLite** — Τοπική βάση δεδομένων
-- **ReportLab** — Δημιουργία PDF
-
-## Δομή Έργου
+## Δομή έργου
 
 ```
 subspy/
 ├── src/
 │   ├── main.py            # Κύρια εφαρμογή Flet
-│   ├── database.py        # Λειτουργίες βάσης δεδομένων
-│   ├── pdf_export.py      # Δημιουργία PDF
-│   └── platform_utils.py  # Cross-platform utilities
-├── pyproject.toml         # Εξαρτήσεις έργου
-├── build.sh               # Build script (Raspberry Pi / PyInstaller)
-├── build_all.sh           # Cross-platform build reference
-└── README.md              # Τεκμηρίωση
+│   ├── database.py        # SQLite βάση δεδομένων
+│   ├── pdf_export.py      # Δημιουργία PDF (ReportLab)
+│   ├── platform_utils.py  # Ανίχνευση πλατφόρμας & cross-platform paths
+│   └── assets/            # Εικονίδια & splash screens
+├── pyproject.toml         # Ρυθμίσεις & εξαρτήσεις
+├── build.sh               # PyInstaller build (Raspberry Pi)
+├── build_all.sh           # Build reference script (όλες οι πλατφόρμες)
+└── README.md
 ```
 
-## Build για διαφορετικές πλατφόρμες
+## Build
 
-> **Σημείωση**: Τα `flet build` commands χρειάζονται [Flutter SDK](https://docs.flutter.dev/get-started/install).
+> **Σημείωση**: Για `flet build` χρειάζεται [Flutter SDK](https://docs.flutter.dev/get-started/install).
+> Για Raspberry Pi χρησιμοποιούμε PyInstaller (δεν χρειάζεται Flutter).
 
 | Πλατφόρμα | Εντολή | Σημειώσεις |
 |-----------|--------|------------|
-| **Raspberry Pi** | `./build.sh` | PyInstaller, τρέχει τοπικά |
-| **Linux** | `flet build linux` | Flet CLI |
+| **Raspberry Pi** | `./build.sh` | PyInstaller, χωρίς Flutter |
+| **Linux** | `flet build linux` | Flet CLI + Flutter |
 | **Windows** | `flet build windows` | Μόνο σε Windows |
 | **macOS** | `flet build macos` | Μόνο σε Mac + Xcode |
-| **Android APK** | `flet build apk` | Χρειάζεται Android SDK |
+| **Android APK** | `flet build apk` | Android SDK |
 | **Android AAB** | `flet build aab` | Για Play Store |
 | **Web** | `flet build web` | Static web app |
 
-Ή χρησιμοποιήστε το `build_all.sh`:
 ```bash
+# Ή μέσω build_all.sh:
 ./build_all.sh rpi    # Raspberry Pi
-./build_all.sh apk    # Android APK
+./build_all.sh apk    # Android
 ./build_all.sh run    # Τρέξε τοπικά
 ```
 
-## Αποθήκευση Δεδομένων
+## Αποθήκευση δεδομένων
 
-| Πλατφόρμα | Τοποθεσία Βάσης Δεδομένων |
-|-----------|--------------------------|
+| Πλατφόρμα | Βάση δεδομένων |
+|-----------|---------------|
 | Linux / Raspberry Pi | `~/subscriptions.db` |
 | Windows | `%APPDATA%\SubsPy\subscriptions.db` |
 | macOS | `~/Library/Application Support/SubsPy/subscriptions.db` |
-| Android | Εσωτερικός χώρος αποθήκευσης εφαρμογής |
+| Android | Εσωτερικός χώρος εφαρμογής |
 
-## Έκδοση
+## Τεχνολογίες
 
-**v2.0** (Φεβρουάριος 2026)
-- Διαχείριση εσόδων και εξόδων
-- Cross-platform υποστήριξη (Windows, macOS, Linux, Android, RPi)
-- FilePicker για εισαγωγή JSON
+- [Flet](https://flet.dev/) 0.80+ — Cross-platform UI framework
+- [SQLite](https://sqlite.org/) — Τοπική βάση δεδομένων
+- [ReportLab](https://www.reportlab.com/) — Δημιουργία PDF
+
+## Ιστορικό εκδόσεων
+
+**v2.0** — Φεβρουάριος 2026
+- Διαχείριση εσόδων και εξόδων (αντί μόνο συνδρομών)
+- Cross-platform υποστήριξη (Windows, macOS, Linux, Android, Raspberry Pi)
 - Ελληνικά DatePickers
-- Εξαγωγή PDF με έγχρωμη διάκριση
+- Εξαγωγή PDF με έγχρωμη διάκριση εσόδων/εξόδων
 - Διαχείριση κατηγοριών
+- Εισαγωγή/Εξαγωγή δεδομένων σε JSON
+
+**v1.0** — Δεκέμβριος 2025
+- Αρχική έκδοση — διαχείριση συνδρομών
+- Voice assistant integration
+- Raspberry Pi only
 
 ## Άδεια
 
@@ -119,4 +142,4 @@ MIT License
 
 ## Συγγραφέας
 
-Alekos
+**SpyAlekos** — [spyalekos@gmail.com](mailto:spyalekos@gmail.com)
