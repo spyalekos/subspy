@@ -212,11 +212,11 @@ def generate_report_pdf(
                 ('TOPPADDING', (0, 1), (-1, -1), 6),
                 
                 # Alternating row colors
-                ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#E3F2FD')]),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#fff8ec')]),
                 
                 # Total row
-                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#1976D2')),
-                ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#a5dfdf')),
+                ('TEXTCOLOR', (0, -1), (-1, -1), colors.black),
                 ('FONTSIZE', (0, -1), (-1, -1), 10),
                 
                 # Grid
@@ -226,12 +226,41 @@ def generate_report_pdf(
             
             elements.append(table)
             
-            # Summary
+            # Summary Table
             elements.append(Spacer(1, 10*mm))
-            elements.append(Paragraph(
-                f"Κινήσεις: {len(charges)} | Έξοδα: €{total_expenses:.2f} | Έσοδα: €{total_income:.2f}",
-                normal_style
-            ))
+            
+            summary_data = [
+                ['Σύνοψη', 'Πλήθος', 'Ποσό']
+            ]
+            summary_data.append(['Κινήσεις', str(len(charges)), '-'])
+            summary_data.append(['Έσοδα', '-', Paragraph(f"€{total_income:.2f}", amount_style_income)])
+            summary_data.append(['Έξοδα', '-', Paragraph(f"€{total_expenses:.2f}", amount_style_expense)])
+            
+            # Use normal_style font for the table text as fallback, though font_name is defined.
+            summary_table = Table(summary_data, colWidths=[40*mm, 20*mm, 30*mm])
+            summary_table.setStyle(TableStyle([
+                # Header
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4CAF50')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('FONTNAME', (0, 0), (-1, 0), font_name),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                ('TOPPADDING', (0, 0), (-1, 0), 6),
+                
+                # Body
+                ('FONTNAME', (0, 1), (-1, -1), font_name),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
+                ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
+                
+                # Grid and Border
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#C8E6C9')),
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#388E3C')),
+            ]))
+            
+            elements.append(summary_table)
         
         # Build PDF
         doc.build(elements)

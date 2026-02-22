@@ -13,7 +13,7 @@ import database as db
 from pdf_export import generate_report_pdf, get_default_pdf_path, REPORTLAB_AVAILABLE
 from platform_utils import get_documents_dir, open_file_with_default_app, get_platform
 
-APP_VERSION = "2.0"
+APP_VERSION = "3.0"
 
 
 def main(page: ft.Page):
