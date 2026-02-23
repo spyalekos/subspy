@@ -55,9 +55,7 @@ def get_data_dir(app_name: str = "SubsPy") -> str:
         return os.path.join(base, app_name)
 
     if plat == 'macos':
-        return os.path.join(
-            os.path.expanduser('~/Library/Application Support'), app_name
-        )
+        return os.path.expanduser('~')
 
     # Linux / Raspberry Pi — keep home dir for backward compatibility
     return os.path.expanduser('~')
