@@ -1,7 +1,7 @@
 # SubsPy - Διαχείριση Εσόδων & Εξόδων
 
 <p align="center">
-  <img src="src/assets/icon.png" alt="SubsPy Logo" width="120"/>
+  <img src="src/assets/icon_new.png" alt="SubsPy Logo" width="120"/>
 </p>
 
 Εφαρμογή διαχείρισης εσόδων και εξόδων, κατασκευασμένη με **Python** και **Flet**.
@@ -122,6 +122,9 @@ subspy/
 - [ReportLab](https://www.reportlab.com/) — Δημιουργία PDF
 
 ## Ιστορικό εκδόσεων
+
+**v4.01** — Μάρτιος 2026
+- Διορθώσεις στην απεικόνιση του νέου εικονιδίου μέσα στην ίδια την εφαρμογή και στο README
 
 **v4.00** — Μάρτιος 2026
 - Προοδευτικά υπόλοιπα (Running balances) στις αναφορές και στα PDF

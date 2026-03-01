@@ -13,7 +13,7 @@ import database as db
 from pdf_export import generate_report_pdf, get_default_pdf_path, REPORTLAB_AVAILABLE
 from platform_utils import get_documents_dir, open_file_with_default_app, get_platform
 
-APP_VERSION = "4.00"
+APP_VERSION = "4.01"
 
 
 def main(page: ft.Page):
@@ -22,6 +22,8 @@ def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
     
+    # Set the window and app icon (looks in assets_dir)
+    page.window.icon = "icon_new.png"
     # Set Greek locale for DatePickers
     page.locale_configuration = ft.LocaleConfiguration(
         supported_locales=[ft.Locale("el", "GR")],
