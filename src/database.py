@@ -38,6 +38,7 @@ def init_database() -> None:
             charge_date DATE NOT NULL,
             amount REAL NOT NULL,
             repeat_days INTEGER DEFAULT 0,
+            repeat_mode TEXT DEFAULT 'days',
             category TEXT DEFAULT '',
             entry_type TEXT DEFAULT 'expense'
         )
@@ -48,6 +49,8 @@ def init_database() -> None:
     
     # Run migration for existing databases
     _migrate_add_entry_type()
+    _migrate_add_repeat_mode()
+    _migrate_add_repeat_mode()
 
 
 def _migrate_add_entry_type() -> None:
@@ -72,22 +75,39 @@ def _migrate_add_entry_type() -> None:
     conn.close()
 
 
+def _migrate_add_repeat_mode() -> None:
+    """Add repeat_mode column if missing."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Check if column exists
+    cursor.execute("PRAGMA table_info(subscriptions)")
+    columns = [col[1] for col in cursor.fetchall()]
+    
+    if 'repeat_mode' not in columns:
+        cursor.execute("ALTER TABLE subscriptions ADD COLUMN repeat_mode TEXT DEFAULT 'days'")
+        conn.commit()
+    
+    conn.close()
+
+
 def add_subscription(
     description: str,
     charge_date: str,
     amount: float,
     repeat_days: int = 0,
     category: str = "",
-    entry_type: str = "expense"
+    entry_type: str = "expense",
+    repeat_mode: str = "days"
 ) -> int:
     """Add a new entry and return its ID."""
     conn = get_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
-        INSERT INTO subscriptions (description, charge_date, amount, repeat_days, category, entry_type)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (description, charge_date, amount, repeat_days, category, entry_type))
+        INSERT INTO subscriptions (description, charge_date, amount, repeat_days, category, entry_type, repeat_mode)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (description, charge_date, amount, repeat_days, category, entry_type, repeat_mode))
     
     subscription_id = cursor.lastrowid
     conn.commit()
@@ -102,7 +122,8 @@ def update_subscription(
     amount: float,
     repeat_days: int = 0,
     category: str = "",
-    entry_type: str = "expense"
+    entry_type: str = "expense",
+    repeat_mode: str = "days"
 ) -> bool:
     """Update an existing entry."""
     conn = get_connection()
@@ -110,9 +131,9 @@ def update_subscription(
     
     cursor.execute('''
         UPDATE subscriptions
-        SET description = ?, charge_date = ?, amount = ?, repeat_days = ?, category = ?, entry_type = ?
+        SET description = ?, charge_date = ?, amount = ?, repeat_days = ?, category = ?, entry_type = ?, repeat_mode = ?
         WHERE id = ?
-    ''', (description, charge_date, amount, repeat_days, category, entry_type, subscription_id))
+    ''', (description, charge_date, amount, repeat_days, category, entry_type, repeat_mode, subscription_id))
     
     success = cursor.rowcount > 0
     conn.commit()
@@ -139,7 +160,7 @@ def get_all_subscriptions() -> List[dict]:
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT id, description, charge_date, amount, repeat_days, category, entry_type
+        SELECT id, description, charge_date, amount, repeat_days, category, entry_type, repeat_mode
         FROM subscriptions
         ORDER BY charge_date
     ''')
@@ -181,8 +202,9 @@ def get_progressive_charges(from_date: str, to_date: str) -> List[dict]:
     for sub in subscriptions:
         charge_dt = datetime.strptime(sub['charge_date'], '%Y-%m-%d')
         repeat_days = sub['repeat_days']
+        repeat_mode = sub.get('repeat_mode', 'days')
         
-        if repeat_days == 0:
+        if repeat_mode == 'days' and repeat_days == 0:
             # Non-repeating: only include if within range
             if from_dt <= charge_dt <= to_dt:
                 charges.append({
@@ -198,8 +220,29 @@ def get_progressive_charges(from_date: str, to_date: str) -> List[dict]:
             current_dt = charge_dt
             
             # Find the first occurrence on or after from_date
-            while current_dt < from_dt:
-                current_dt += timedelta(days=repeat_days)
+            if repeat_mode == 'monthly':
+                # To advance by months, calculate month bumps.
+                while current_dt < from_dt:
+                    new_month = current_dt.month + 1
+                    new_year = current_dt.year
+                    if new_month > 12:
+                        new_month = 1
+                        new_year += 1
+                    # Handle end of month issues (e.g. Jan 31 -> Feb 28)
+                    try:
+                        current_dt = current_dt.replace(year=new_year, month=new_month)
+                    except ValueError: # e.g. Feb 29 on non-leap year or Feb 31
+                        if new_month == 2:
+                            # February
+                            if new_year % 4 == 0 and (new_year % 100 != 0 or new_year % 400 == 0):
+                                current_dt = current_dt.replace(year=new_year, month=new_month, day=29)
+                            else:
+                                current_dt = current_dt.replace(year=new_year, month=new_month, day=28)
+                        elif new_month in [4, 6, 9, 11]:
+                            current_dt = current_dt.replace(year=new_year, month=new_month, day=30)
+            else:
+                while current_dt < from_dt:
+                    current_dt += timedelta(days=repeat_days)
             
             # Add all occurrences within the range
             while current_dt <= to_dt:
@@ -211,7 +254,23 @@ def get_progressive_charges(from_date: str, to_date: str) -> List[dict]:
                     'entry_type': sub.get('entry_type', 'expense'),
                     'subscription_id': sub['id']
                 })
-                current_dt += timedelta(days=repeat_days)
+                
+                if repeat_mode == 'monthly':
+                    new_month = current_dt.month + 1
+                    new_year = current_dt.year
+                    if new_month > 12:
+                        new_month = 1
+                        new_year += 1
+                    # Base day is from the original charge_dt, but adapt to shorter months
+                    target_day = charge_dt.day
+                    while True:
+                        try:
+                            current_dt = current_dt.replace(year=new_year, month=new_month, day=target_day)
+                            break
+                        except ValueError:
+                            target_day -= 1
+                else:
+                    current_dt += timedelta(days=repeat_days)
     
     # Sort by date
     charges.sort(key=lambda x: x['date'])
@@ -382,15 +441,16 @@ def import_database(filepath: str, replace: bool = True) -> Tuple[bool, str]:
         count = 0
         for sub in subscriptions:
             cursor.execute('''
-                INSERT INTO subscriptions (description, charge_date, amount, repeat_days, category, entry_type)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO subscriptions (description, charge_date, amount, repeat_days, category, entry_type, repeat_mode)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (
                 sub.get('description', ''),
                 sub.get('charge_date', ''),
                 sub.get('amount', 0),
                 sub.get('repeat_days', 0),
                 sub.get('category', ''),
-                sub.get('entry_type', 'expense')
+                sub.get('entry_type', 'expense'),
+                sub.get('repeat_mode', 'days')
             ))
             count += 1
         

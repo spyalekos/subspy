@@ -41,7 +41,7 @@ def get_data_dir(app_name: str = "SubsPy") -> str:
     Get the appropriate data directory for the current platform.
 
     - Android: FLET_APP_STORAGE_DATA
-    - Windows: %APPDATA%/SubsPy
+    - Windows: Executable directory (sys.argv[0])
     - macOS: ~/Library/Application Support/SubsPy
     - Linux/RPi: ~ (home directory, for backward compatibility)
     """
@@ -51,11 +51,17 @@ def get_data_dir(app_name: str = "SubsPy") -> str:
         return os.environ.get('FLET_APP_STORAGE_DATA', os.path.expanduser('~'))
 
     if plat == 'windows':
-        base = os.environ.get('APPDATA', os.path.expanduser('~'))
-        return os.path.join(base, app_name)
+        if getattr(sys, 'frozen', False):
+            # Running as compiled executable
+            return os.path.dirname(sys.executable)
+        else:
+            # Running as script
+            return os.path.dirname(os.path.abspath(sys.argv[0]))
 
     if plat == 'macos':
-        return os.path.expanduser('~')
+        return os.path.join(
+            os.path.expanduser('~/Library/Application Support'), app_name
+        )
 
     # Linux / Raspberry Pi — keep home dir for backward compatibility
     return os.path.expanduser('~')

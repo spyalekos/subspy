@@ -55,12 +55,15 @@ def generate_report_pdf(
     charges: List[dict],
     from_date: str,
     to_date: str,
-    filepath: str
+    filepath: str,
+    raw_from_date: datetime = None
 ) -> tuple[bool, str]:
     """
     Generate PDF report for progressive charges.
     Returns (success, message).
     """
+    import database as db  # local import avoiding circular dependancy issues if any
+    
     if not REPORTLAB_AVAILABLE:
         return False, "Η βιβλιοθήκη reportlab δεν είναι εγκατεστημένη."
     
@@ -129,7 +132,7 @@ def generate_report_pdf(
         else:
             # Table data
             table_data = [
-                ['Ημερομηνία', 'Περιγραφή', 'Κατηγορία', 'Ποσό (€)']
+                ['Ημερομηνία', 'Περιγραφή', 'Κατηγορία', 'Ποσό (€)', 'Υπόλοιπο']
             ]
             
             # Styles for colored amounts
@@ -156,6 +159,9 @@ def generate_report_pdf(
                 fontSize=9,
             )
             
+            
+            # Opening balance for running balance
+            running_balance = 0.0
             total = 0.0
             total_income = 0.0
             total_expenses = 0.0
@@ -168,28 +174,36 @@ def generate_report_pdf(
                 if is_income:
                     total -= amount
                     total_income += amount
+                    running_balance += amount
                     amount_text = Paragraph(f"+€{amount:.2f}", amount_style_income)
                 else:
                     total += amount
                     total_expenses += amount
+                    running_balance -= amount
                     amount_text = Paragraph(f"−€{amount:.2f}", amount_style_expense)
+                
+                if running_balance >= 0:
+                    balance_text = Paragraph(f"+€{running_balance:.2f}", amount_style_income)
+                else:
+                    balance_text = Paragraph(f"−€{abs(running_balance):.2f}", amount_style_expense)
                 
                 table_data.append([
                     date_formatted,
                     Paragraph(charge['description'][:40], cell_style),
                     Paragraph(charge['category'][:20], cell_style),
-                    amount_text
+                    amount_text,
+                    balance_text
                 ])
             
             # Total row
-            if total >= 0:
-                total_text = Paragraph(f"−€{total:.2f}", amount_style_expense)
+            if running_balance >= 0:
+                total_text = Paragraph(f"+€{running_balance:.2f}", amount_style_income)
             else:
-                total_text = Paragraph(f"+€{abs(total):.2f}", amount_style_income)
-            table_data.append(['', '', Paragraph('Υπόλοιπο:', cell_style), total_text])
+                total_text = Paragraph(f"−€{abs(running_balance):.2f}", amount_style_expense)
+            table_data.append(['', '', '', Paragraph('Τελ. Υπόλοιπο:', cell_style), total_text])
             
             # Create table
-            col_widths = [25*mm, 70*mm, 40*mm, 25*mm]
+            col_widths = [23*mm, 60*mm, 30*mm, 23*mm, 23*mm]
             table = Table(table_data, colWidths=col_widths, repeatRows=1)
             
             # Table style
@@ -205,9 +219,9 @@ def generate_report_pdf(
                 
                 # Body
                 ('FONTNAME', (0, 1), (-1, -1), font_name),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
                 ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # Date column
-                ('ALIGN', (3, 1), (3, -1), 'RIGHT'),   # Amount column
+                ('ALIGN', (3, 1), (4, -1), 'RIGHT'),   # Amount & Balance columns
                 ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
                 ('TOPPADDING', (0, 1), (-1, -1), 6),
                 

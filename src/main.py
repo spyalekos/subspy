@@ -13,7 +13,7 @@ import database as db
 from pdf_export import generate_report_pdf, get_default_pdf_path, REPORTLAB_AVAILABLE
 from platform_utils import get_documents_dir, open_file_with_default_app, get_platform
 
-APP_VERSION = "3.0"
+APP_VERSION = "4.00"
 
 
 def main(page: ft.Page):
@@ -64,12 +64,30 @@ def main(page: ft.Page):
         keyboard_type=ft.KeyboardType.NUMBER,
         width=120
     )
+    dlg_repeat_mode = ft.Dropdown(
+        label="Τύπος Επανάληψης",
+        width=180,
+        options=[
+            ft.dropdown.Option("days", "Ανά ημέρες"),
+            ft.dropdown.Option("monthly", "Κάθε μήνα")
+        ],
+        value="days"
+    )
     dlg_repeat_days = ft.TextField(
         label="Επανάληψη (ημέρες)",
         keyboard_type=ft.KeyboardType.NUMBER,
         width=120,
         value="0"
     )
+    
+    def on_repeat_mode_change(e):
+        if dlg_repeat_mode.value == "monthly":
+            dlg_repeat_days.visible = False
+        else:
+            dlg_repeat_days.visible = True
+        page.update()
+        
+    dlg_repeat_mode.on_change = on_repeat_mode_change
     dlg_category = ft.Dropdown(
         label="Κατηγορία",
         width=200,
@@ -113,6 +131,8 @@ def main(page: ft.Page):
             repeat_days = int(dlg_repeat_days.value or "0")
         except ValueError:
             repeat_days = 0
+            
+        repeat_mode = dlg_repeat_mode.value or "days"
         
         charge_date = dlg_selected_date.strftime("%Y-%m-%d")
         category = dlg_category.value or ""
@@ -121,11 +141,11 @@ def main(page: ft.Page):
         if selected_subscription_id:
             db.update_subscription(
                 selected_subscription_id,
-                description, charge_date, amount, repeat_days, category, entry_type
+                description, charge_date, amount, repeat_days, category, entry_type, repeat_mode
             )
             show_snackbar("Η καταχώρηση ενημερώθηκε!")
         else:
-            db.add_subscription(description, charge_date, amount, repeat_days, category, entry_type)
+            db.add_subscription(description, charge_date, amount, repeat_days, category, entry_type, repeat_mode)
             show_snackbar("Η καταχώρηση προστέθηκε!")
         
         close_subscription_dialog()
@@ -184,7 +204,7 @@ def main(page: ft.Page):
         modal=True,
         title=ft.Text("Καταχώρηση"),
         content=ft.Container(
-            width=350,
+            width=480,
             content=ft.Column([
                 dlg_entry_type,
                 dlg_description,
@@ -194,10 +214,11 @@ def main(page: ft.Page):
                 ], alignment=ft.MainAxisAlignment.START),
                 ft.Row([
                     dlg_amount,
+                    dlg_repeat_mode,
                     dlg_repeat_days
                 ]),
                 dlg_category,
-                ft.Text("Επανάληψη 0 = μη επαναλαμβανόμενη", size=11, italic=True, color=ft.Colors.GREY_600)
+                ft.Text("Επανάληψη ανά 0 ημέρες = μη επαναλαμβανόμενη", size=11, italic=True, color=ft.Colors.GREY_600)
             ], tight=True, spacing=10)
         ),
         actions=[
@@ -217,7 +238,9 @@ def main(page: ft.Page):
             selected_subscription_id = subscription['id']
             dlg_description.value = subscription['description']
             dlg_amount.value = str(subscription['amount'])
+            dlg_repeat_mode.value = subscription.get('repeat_mode', 'days')
             dlg_repeat_days.value = str(subscription['repeat_days'])
+            dlg_repeat_days.visible = (dlg_repeat_mode.value == 'days')
             dlg_category.value = subscription['category']
             dlg_entry_type.selected = [subscription.get('entry_type', 'expense')]
             dlg_selected_date = datetime.strptime(subscription['charge_date'], '%Y-%m-%d')
@@ -228,7 +251,9 @@ def main(page: ft.Page):
             selected_subscription_id = None
             dlg_description.value = ""
             dlg_amount.value = ""
+            dlg_repeat_mode.value = "days"
             dlg_repeat_days.value = "0"
+            dlg_repeat_days.visible = True
             dlg_category.value = None
             dlg_entry_type.selected = ["expense"]
             dlg_selected_date = datetime.now()
@@ -268,7 +293,12 @@ def main(page: ft.Page):
         
         for sub in subscriptions:
             date_formatted = datetime.strptime(sub['charge_date'], '%Y-%m-%d').strftime('%d/%m/%Y')
-            repeat_text = f"{sub['repeat_days']} ημέρες" if sub['repeat_days'] > 0 else "Μία φορά"
+            repeat_mode = sub.get('repeat_mode', 'days')
+            if repeat_mode == 'monthly':
+                repeat_text = "Κάθε μήνα"
+            else:
+                repeat_text = f"{sub['repeat_days']} ημέρες" if sub['repeat_days'] > 0 else "Μία φορά"
+            
             entry_type = sub.get('entry_type', 'expense')
             is_income = entry_type == 'income'
             amount_color = ft.Colors.GREEN_700 if is_income else ft.Colors.RED_700
@@ -328,6 +358,7 @@ def main(page: ft.Page):
             ft.DataColumn(ft.Text("Επανάληψη", weight=ft.FontWeight.BOLD)),
             ft.DataColumn(ft.Text("Κατηγορία", weight=ft.FontWeight.BOLD)),
             ft.DataColumn(ft.Text("Ποσό (€)", weight=ft.FontWeight.BOLD), numeric=True),
+            ft.DataColumn(ft.Text("Υπόλοιπο", weight=ft.FontWeight.BOLD), numeric=True),
         ],
         rows=[],
         border=ft.Border.all(1, ft.Colors.GREY_300),
@@ -395,21 +426,23 @@ def main(page: ft.Page):
     def refresh_report():
         from_str = report_from_date.strftime("%Y-%m-%d")
         to_str = report_to_date.strftime("%Y-%m-%d")
+        
+        # Calculate charges for the selected period
         charges = db.get_progressive_charges(from_str, to_str)
         
         report_table.rows.clear()
-        total = 0.0
+        
+        running_balance = 0.0
         
         for charge in charges:
             date_formatted = datetime.strptime(charge['date'], '%Y-%m-%d').strftime('%d/%m/%Y')
             entry_type = charge.get('entry_type', 'expense')
             is_income = entry_type == 'income'
             
-            # Income subtracts from total (net balance: expenses - income)
             if is_income:
-                total -= charge['amount']
+                running_balance += charge['amount']
             else:
-                total += charge['amount']
+                running_balance -= charge['amount']
             
             amount_color = ft.Colors.GREEN_700 if is_income else ft.Colors.RED_700
             amount_prefix = "+" if is_income else "−"
@@ -420,8 +453,15 @@ def main(page: ft.Page):
             
             # Get repeat info from the subscription
             sub_data = db.get_subscription_by_id(charge.get('subscription_id'))
+            repeat_mode = sub_data.get('repeat_mode', 'days') if sub_data else 'days'
             repeat_days = sub_data['repeat_days'] if sub_data else 0
-            repeat_text = f"{repeat_days} ημέρες" if repeat_days > 0 else "Μία φορά"
+            if repeat_mode == 'monthly':
+                repeat_text = "Κάθε μήνα"
+            else:
+                repeat_text = f"{repeat_days} ημέρες" if repeat_days > 0 else "Μία φορά"
+                
+            balance_color = ft.Colors.GREEN_700 if running_balance >= 0 else ft.Colors.RED_700
+            balance_prefix = "+" if running_balance >= 0 else "−"
             
             row = ft.DataRow(cells=[
                 ft.DataCell(ft.Text(date_formatted)),
@@ -430,16 +470,17 @@ def main(page: ft.Page):
                 ft.DataCell(ft.Text(repeat_text)),
                 ft.DataCell(ft.Text(charge['category'])),
                 ft.DataCell(ft.Text(f"{amount_prefix}€{charge['amount']:.2f}", color=amount_color, weight=ft.FontWeight.BOLD)),
+                ft.DataCell(ft.Text(f"{balance_prefix}€{abs(running_balance):.2f}", color=balance_color, weight=ft.FontWeight.BOLD)),
             ])
             report_table.rows.append(row)
         
         # Show net balance with color
-        if total >= 0:
-            report_total_text.value = f"Υπόλοιπο: −€{total:.2f}"
-            report_total_text.color = ft.Colors.RED_700
-        else:
-            report_total_text.value = f"Υπόλοιπο: +€{abs(total):.2f}"
+        if running_balance >= 0:
+            report_total_text.value = f"Τελικό Υπόλοιπο: +€{running_balance:.2f}"
             report_total_text.color = ft.Colors.GREEN_700
+        else:
+            report_total_text.value = f"Τελικό Υπόλοιπο: −€{abs(running_balance):.2f}"
+            report_total_text.color = ft.Colors.RED_700
         report_count_text.value = f"Κινήσεις: {len(charges)}"
         page.update()
     
@@ -456,7 +497,7 @@ def main(page: ft.Page):
         charges = db.get_progressive_charges(from_str, to_str)
         
         pdf_path = get_default_pdf_path()
-        success, message = generate_report_pdf(charges, from_str, to_str, pdf_path)
+        success, message = generate_report_pdf(charges, from_str, to_str, pdf_path, report_from_date)
         
         if success:
             show_snackbar(f"PDF: {pdf_path}")
@@ -749,9 +790,9 @@ def main(page: ft.Page):
                     ]),
                     ft.Column([
                         ft.Text("• Καταχωρήσεις: Προσθέστε έσοδα/έξοδα. Πατήστε πάνω σε μια εγγραφή για επεξεργασία ή διαγραφή.", size=11, color=ft.Colors.GREY_700),
-                        ft.Text("• Επανάληψη: Ορίστε αριθμό ημερών (π.χ. 30 = μηνιαία, 365 = ετήσια, 0 = μη επαναλαμβανόμενη).", size=11, color=ft.Colors.GREY_700),
-                        ft.Text("• Αναφορές: Επιλέξτε ημερομηνίες «Από» και «Έως» και πατήστε «Δημιουργία» για προβολή κινήσεων.", size=11, color=ft.Colors.GREY_700),
-                        ft.Text("• Τα ποσά εμφανίζονται με χρώμα: πράσινο (+) για έσοδα, κόκκινο (−) για έξοδα.", size=11, color=ft.Colors.GREY_700),
+                        ft.Text("• Επανάληψη: Επιλέξτε 'Ανά ημέρες' (π.χ. 365 = ετήσια) ή 'Κάθε μήνα' για μηνιαίες συνδρομές.", size=11, color=ft.Colors.GREY_700),
+                        ft.Text("• Αναφορές: Επιλέξτε ημερομηνίες «Από» και «Έως» για προβολή κινήσεων και προοδευτικών υπολοίπων.", size=11, color=ft.Colors.GREY_700),
+                        ft.Text("• Τα ποσά εμφανίζονται με χρώμα: πράσινο (+) για έσοδα/θετικά υπόλοιπα, κόκκινο (−) για έξοδα/αρνητικά.", size=11, color=ft.Colors.GREY_700),
                     ], spacing=3),
                     ft.Container(height=8),
                     ft.Text("© 2026 SpyAlekos", size=10, italic=True, color=ft.Colors.GREY_500, text_align=ft.TextAlign.CENTER),
