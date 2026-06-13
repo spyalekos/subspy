@@ -15,6 +15,8 @@
 - 📄 **Εξαγωγή PDF** — Αναφορά σε PDF με έγχρωμη διάκριση (πράσινο = έσοδα, κόκκινο = έξοδα)
 - 🏷️ **Κατηγορίες** — Οργάνωση κινήσεων σε προσαρμοσμένες κατηγορίες
 - 💾 **Backup/Restore** — Εξαγωγή και εισαγωγή δεδομένων σε JSON
+- ❔ **Οδηγίες στην εφαρμογή** — Εικονίδιο βοήθειας στο επάνω μέρος με οδηγίες στα Ελληνικά και Αγγλικά
+- 🔎 **Αναλογικό zoom** — `Ctrl` + ρόδα ποντικιού για μεγέθυνση/σμίκρυνση όλων των στοιχείων της οθόνης
 - 🌍 **Ελληνικά** — Πλήρες ελληνικό UI (μενού, DatePickers, μηνύματα)
 - 🖥️ **Cross-platform** — Windows, macOS, Linux, Raspberry Pi, Android
 
@@ -30,23 +32,18 @@
 git clone https://github.com/spyalekos/subspy.git
 cd subspy
 
-# Δημιουργία virtual environment
-python3 -m venv .venv
-source .venv/bin/activate    # Linux/Mac
-# .venv\Scripts\activate     # Windows
-
-# Εγκατάσταση εξαρτήσεων
-pip install flet reportlab
+# Συγχρονισμός εξαρτήσεων
+uv sync
 ```
 
 ### Εκτέλεση
 
 ```bash
 # Με Flet CLI (hot reload)
-flet run src
+uv run flet run src
 
 # Ή απευθείας
-.venv/bin/python src/main.py
+uv run python src/main.py
 ```
 
 ## Χρήση
@@ -68,17 +65,28 @@ flet run src
 - **Εισαγωγή**: Επαναφορά δεδομένων από αρχείο JSON
 - **Κατηγορίες**: Προσθήκη και διαγραφή κατηγοριών
 
+### ❔ Οδηγίες και zoom
+- Πατήστε το εικονίδιο **?** στο επάνω μέρος για σύντομες οδηγίες στα Ελληνικά και Αγγλικά
+- Κρατήστε πατημένο το `Ctrl` και γυρίστε τη ρόδα του ποντικιού για αναλογικό zoom όλης της οθόνης
+
+## English Quick Notes
+
+- Use the top **?** icon for built-in Greek/English instructions.
+- Hold `Ctrl` and use the mouse wheel to scale the whole UI up or down.
+
 ## Δομή έργου
 
 ```
 subspy/
 ├── src/
 │   ├── main.py            # Κύρια εφαρμογή Flet
+│   ├── version.py         # Hardcoded έκδοση εφαρμογής
 │   ├── database.py        # SQLite βάση δεδομένων
 │   ├── pdf_export.py      # Δημιουργία PDF (ReportLab)
 │   ├── platform_utils.py  # Ανίχνευση πλατφόρμας & cross-platform paths
 │   └── assets/            # Εικονίδια & splash screens
 ├── pyproject.toml         # Ρυθμίσεις & εξαρτήσεις
+├── main.spec              # Τρέχον PyInstaller spec
 ├── build.sh               # PyInstaller build (Raspberry Pi)
 ├── build_all.sh           # Build reference script (όλες οι πλατφόρμες)
 └── README.md
@@ -92,12 +100,18 @@ subspy/
 | Πλατφόρμα | Εντολή | Σημειώσεις |
 |-----------|--------|------------|
 | **Raspberry Pi** | `./build.sh` | PyInstaller, χωρίς Flutter |
-| **Linux** | `flet build linux` | Flet CLI + Flutter |
-| **Windows** | `flet build windows` | Μόνο σε Windows |
-| **macOS** | `flet build macos` | Μόνο σε Mac + Xcode |
-| **Android APK** | `flet build apk` | Android SDK |
-| **Android AAB** | `flet build aab` | Για Play Store |
-| **Web** | `flet build web` | Static web app |
+| **Linux** | `uv run flet build linux` | Flet CLI + Flutter |
+| **Windows** | `uv run flet build windows` | Μόνο σε Windows |
+| **macOS** | `uv run flet build macos` | Μόνο σε Mac + Xcode |
+| **Android APK** | `uv run flet build apk` | Android SDK |
+| **Android AAB** | `uv run flet build aab` | Για Play Store |
+| **Web** | `uv run flet build web` | Static web app |
+
+Το τρέχον PyInstaller spec είναι το `main.spec` και η εντολή build για `.exe` είναι:
+
+```bash
+uv run pyinstaller main.spec
+```
 
 ```bash
 # Ή μέσω build_all.sh:
@@ -122,6 +136,12 @@ subspy/
 - [ReportLab](https://www.reportlab.com/) — Δημιουργία PDF
 
 ## Ιστορικό εκδόσεων
+
+**v4.02** — Ιούνιος 2026
+- Προστέθηκε επάνω εικονίδιο οδηγιών με περιεχόμενο στα Ελληνικά και Αγγλικά
+- Προστέθηκε αναλογικό zoom όλου του UI με `Ctrl` + ρόδα ποντικιού
+- Ευθυγραμμίστηκε η έκδοση σε `pyproject.toml` και `src/version.py`
+- Προστέθηκε τρέχον `main.spec` για PyInstaller build
 
 **v4.01** — Μάρτιος 2026
 - Διορθώσεις στην απεικόνιση του νέου εικονιδίου μέσα στην ίδια την εφαρμογή και στο README

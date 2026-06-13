@@ -12,8 +12,9 @@ import os
 import database as db
 from pdf_export import generate_report_pdf, get_default_pdf_path, REPORTLAB_AVAILABLE
 from platform_utils import get_documents_dir, open_file_with_default_app, get_platform
+from version import VERSION
 
-APP_VERSION = "4.01"
+APP_VERSION = VERSION
 
 
 def main(page: ft.Page):
@@ -36,6 +37,8 @@ def main(page: ft.Page):
     dlg_selected_date = datetime.now()
     report_from_date = datetime.now()
     report_to_date = datetime.now() + timedelta(days=30)
+    zoom_scale = 1.0
+    ctrl_pressed = False
     
     # ==================== HELPER FUNCTIONS ====================
     
@@ -53,6 +56,11 @@ def main(page: ft.Page):
     def get_categories_list() -> list:
         """Get all categories from database."""
         return db.get_all_categories()
+
+    def is_control_key(key: str) -> bool:
+        """Return True for common Flet/Flutter labels of the Ctrl key."""
+        normalized = (key or "").lower()
+        return "control" in normalized or normalized in {"ctrl", "controlleft", "controlright"}
     
     # ==================== ENTRY DIALOG ====================
     
@@ -98,15 +106,15 @@ def main(page: ft.Page):
     dlg_entry_type = ft.SegmentedButton(
         selected=["expense"],
         segments=[
-            ft.Segment(value="expense", label=ft.Text("Έξοδο"), icon=ft.Icon(ft.Icons.ARROW_DOWNWARD, color=ft.Colors.RED_700)),
-            ft.Segment(value="income", label=ft.Text("Έσοδο"), icon=ft.Icon(ft.Icons.ARROW_UPWARD, color=ft.Colors.GREEN_700)),
+            ft.Segment(value="expense", label=ft.Text("Έξοδο"), icon=ft.Icon(ft.CupertinoIcons.ARROW_DOWN, color=ft.Colors.RED_700)),
+            ft.Segment(value="income", label=ft.Text("Έσοδο"), icon=ft.Icon(ft.CupertinoIcons.ARROW_UP, color=ft.Colors.GREEN_700)),
         ],
     )
     dlg_date_text = ft.Text("", size=14)
     
     dlg_delete_button = ft.TextButton(
         "Διαγραφή",
-        icon=ft.Icons.DELETE,
+        icon=ft.CupertinoIcons.TRASH,
         style=ft.ButtonStyle(color=ft.Colors.RED_400),
         visible=False
     )
@@ -198,7 +206,7 @@ def main(page: ft.Page):
     
     dlg_date_button = ft.TextButton(
         "Επιλογή Ημερομηνίας",
-        icon=ft.Icons.CALENDAR_MONTH,
+        icon=ft.CupertinoIcons.CALENDAR,
         on_click=open_date_picker
     )
     
@@ -306,7 +314,7 @@ def main(page: ft.Page):
             amount_color = ft.Colors.GREEN_700 if is_income else ft.Colors.RED_700
             amount_prefix = "+" if is_income else "−"
             type_text = "Έσοδο" if is_income else "Έξοδο"
-            type_icon = ft.Icons.ARROW_UPWARD if is_income else ft.Icons.ARROW_DOWNWARD
+            type_icon = ft.CupertinoIcons.ARROW_UP if is_income else ft.CupertinoIcons.ARROW_DOWN
             type_color = ft.Colors.GREEN_700 if is_income else ft.Colors.RED_700
             
             row = ft.DataRow(
@@ -335,7 +343,7 @@ def main(page: ft.Page):
                 ft.Text("Καταχωρήσεις", size=20, weight=ft.FontWeight.BOLD),
                 ft.TextButton(
                     "Προσθήκη",
-                    icon=ft.Icons.ADD,
+                    icon=ft.CupertinoIcons.PLUS,
                     on_click=add_subscription_click
                 )
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
@@ -450,7 +458,7 @@ def main(page: ft.Page):
             amount_prefix = "+" if is_income else "−"
             
             type_text = "Έσοδο" if is_income else "Έξοδο"
-            type_icon = ft.Icons.ARROW_UPWARD if is_income else ft.Icons.ARROW_DOWNWARD
+            type_icon = ft.CupertinoIcons.ARROW_UP if is_income else ft.CupertinoIcons.ARROW_DOWN
             type_color = ft.Colors.GREEN_700 if is_income else ft.Colors.RED_700
             
             # Get repeat info from the subscription
@@ -520,19 +528,19 @@ def main(page: ft.Page):
                 ft.Column([
                     ft.Text("Από:", weight=ft.FontWeight.BOLD),
                     ft.Row([
-                        ft.IconButton(icon=ft.Icons.CALENDAR_MONTH, on_click=open_report_from_picker),
+                        ft.IconButton(icon=ft.CupertinoIcons.CALENDAR, on_click=open_report_from_picker),
                         report_from_text
                     ])
                 ]),
                 ft.Column([
                     ft.Text("Έως:", weight=ft.FontWeight.BOLD),
                     ft.Row([
-                        ft.IconButton(icon=ft.Icons.CALENDAR_MONTH, on_click=open_report_to_picker),
+                        ft.IconButton(icon=ft.CupertinoIcons.CALENDAR, on_click=open_report_to_picker),
                         report_to_text
                     ])
                 ]),
-                ft.TextButton("Δημιουργία", icon=ft.Icons.SEARCH, on_click=generate_report_click),
-                ft.TextButton("Εκτύπωση PDF", icon=ft.Icons.PICTURE_AS_PDF, on_click=export_pdf_click),
+                ft.TextButton("Δημιουργία", icon=ft.CupertinoIcons.SEARCH, on_click=generate_report_click),
+                ft.TextButton("Εκτύπωση PDF", icon=ft.CupertinoIcons.DOC_TEXT, on_click=export_pdf_click),
             ], alignment=ft.MainAxisAlignment.START, spacing=20),
             ft.Container(height=10),
             ft.Row([report_count_text, report_total_text], spacing=20),
@@ -584,7 +592,7 @@ def main(page: ft.Page):
                         content=ft.Row([
                             ft.Text(cat, expand=True, size=14),
                             ft.IconButton(
-                                icon=ft.Icons.DELETE_OUTLINE,
+                                icon=ft.CupertinoIcons.TRASH,
                                 icon_color=ft.Colors.RED_400,
                                 icon_size=20,
                                 tooltip=f"Διαγραφή '{cat}'",
@@ -679,7 +687,7 @@ def main(page: ft.Page):
                     ft.Container(height=5),
                     ft.TextButton(
                         "Εξαγωγή",
-                        icon=ft.Icons.DOWNLOAD,
+                        icon=ft.CupertinoIcons.TRAY_ARROW_DOWN,
                         on_click=export_database_click
                     ),
                     export_status,
@@ -704,7 +712,7 @@ def main(page: ft.Page):
                     ft.Container(height=5),
                     ft.TextButton(
                         "Εισαγωγή",
-                        icon=ft.Icons.UPLOAD,
+                        icon=ft.CupertinoIcons.TRAY_ARROW_UP,
                         on_click=import_database_click
                     ),
                     import_status
@@ -728,7 +736,7 @@ def main(page: ft.Page):
                     ft.Row([
                         new_category_field,
                         ft.IconButton(
-                            icon=ft.Icons.ADD_CIRCLE,
+                            icon=ft.CupertinoIcons.PLUS_CIRCLE,
                             icon_color=ft.Colors.GREEN_700,
                             tooltip="Προσθήκη κατηγορίας",
                             on_click=add_category_click
@@ -749,7 +757,7 @@ def main(page: ft.Page):
                 border_radius=10,
                 content=ft.Column([
                     ft.Row([
-                        ft.Icon(ft.Icons.INFO_OUTLINE, color=ft.Colors.BLUE_700),
+                        ft.Icon(ft.CupertinoIcons.INFO_CIRCLE, color=ft.Colors.BLUE_700),
                         ft.Text("Πληροφορίες", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_700, size=16)
                     ]),
                     ft.Divider(height=1, color=ft.Colors.BLUE_200),
@@ -757,7 +765,7 @@ def main(page: ft.Page):
                     ft.Text(f"Βάση δεδομένων: {db.get_db_path()}", size=11, color=ft.Colors.GREY_600),
                     ft.Container(height=10),
                     ft.Row([
-                        ft.Icon(ft.Icons.DESCRIPTION, size=18, color=ft.Colors.BLUE_600),
+                        ft.Icon(ft.CupertinoIcons.DOC_TEXT, size=18, color=ft.Colors.BLUE_600),
                         ft.Text("Τι κάνει η εφαρμογή", weight=ft.FontWeight.BOLD, size=13)
                     ]),
                     ft.Text(
@@ -768,26 +776,26 @@ def main(page: ft.Page):
                     ),
                     ft.Container(height=8),
                     ft.Row([
-                        ft.Icon(ft.Icons.STAR, size=18, color=ft.Colors.AMBER_600),
+                        ft.Icon(ft.CupertinoIcons.STAR, size=18, color=ft.Colors.AMBER_600),
                         ft.Text("Δυνατότητες", weight=ft.FontWeight.BOLD, size=13)
                     ]),
                     ft.Column([
-                        ft.Row([ft.Icon(ft.Icons.ADD_CIRCLE_OUTLINE, size=14, color=ft.Colors.GREEN_600),
+                        ft.Row([ft.Icon(ft.CupertinoIcons.PLUS_CIRCLE, size=14, color=ft.Colors.GREEN_600),
                                 ft.Text("Καταχώρηση εσόδων και εξόδων με ημερομηνία, ποσό και κατηγορία", size=11)], spacing=5),
-                        ft.Row([ft.Icon(ft.Icons.REPEAT, size=14, color=ft.Colors.ORANGE_600),
+                        ft.Row([ft.Icon(ft.CupertinoIcons.REPEAT, size=14, color=ft.Colors.ORANGE_600),
                                 ft.Text("Επαναλαμβανόμενες κινήσεις (π.χ. κάθε 30 ημέρες για μηνιαίες συνδρομές)", size=11)], spacing=5),
-                        ft.Row([ft.Icon(ft.Icons.ASSESSMENT, size=14, color=ft.Colors.PURPLE_600),
+                        ft.Row([ft.Icon(ft.CupertinoIcons.CHART_BAR, size=14, color=ft.Colors.PURPLE_600),
                                 ft.Text("Αναφορές προοδευτικών χρεώσεων για οποιοδήποτε χρονικό διάστημα", size=11)], spacing=5),
-                        ft.Row([ft.Icon(ft.Icons.PICTURE_AS_PDF, size=14, color=ft.Colors.RED_600),
+                        ft.Row([ft.Icon(ft.CupertinoIcons.DOC_TEXT, size=14, color=ft.Colors.RED_600),
                                 ft.Text("Εξαγωγή αναφοράς σε PDF με έγχρωμη διάκριση εσόδων/εξόδων", size=11)], spacing=5),
-                        ft.Row([ft.Icon(ft.Icons.CATEGORY, size=14, color=ft.Colors.TEAL_600),
+                        ft.Row([ft.Icon(ft.CupertinoIcons.TAG, size=14, color=ft.Colors.TEAL_600),
                                 ft.Text("Διαχείριση κατηγοριών (προσθήκη, διαγραφή)", size=11)], spacing=5),
-                        ft.Row([ft.Icon(ft.Icons.IMPORT_EXPORT, size=14, color=ft.Colors.BLUE_600),
+                        ft.Row([ft.Icon(ft.CupertinoIcons.ARROW_UP_ARROW_DOWN, size=14, color=ft.Colors.BLUE_600),
                                 ft.Text("Εξαγωγή/Εισαγωγή δεδομένων σε μορφή JSON για backup", size=11)], spacing=5),
                     ], spacing=4),
                     ft.Container(height=8),
                     ft.Row([
-                        ft.Icon(ft.Icons.HELP_OUTLINE, size=18, color=ft.Colors.TEAL_600),
+                        ft.Icon(ft.CupertinoIcons.QUESTION_CIRCLE, size=18, color=ft.Colors.TEAL_600),
                         ft.Text("Πώς λειτουργεί", weight=ft.FontWeight.BOLD, size=13)
                     ]),
                     ft.Column([
@@ -807,6 +815,89 @@ def main(page: ft.Page):
     
     tab_contents = [subscriptions_content, reports_content, import_export_content]
     content_container = ft.Container(expand=True, content=subscriptions_content)
+    zoom_status = ft.Text("100%", size=12, color=ft.Colors.GREY_700)
+    main_column = ft.Column(expand=True)
+
+    instructions_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Row([
+            ft.Icon(ft.CupertinoIcons.QUESTION_CIRCLE, color=ft.Colors.BLUE_700),
+            ft.Text("Οδηγίες / Instructions", weight=ft.FontWeight.BOLD),
+        ], spacing=8),
+        content=ft.Container(
+            width=520,
+            content=ft.Column([
+                ft.Text("Ελληνικά", weight=ft.FontWeight.BOLD, size=14),
+                ft.Text("• Καταχωρήσεις: Πατήστε «Προσθήκη» για έσοδα ή έξοδα και πατήστε σε γραμμή για επεξεργασία.", size=12),
+                ft.Text("• Αναφορές: Επιλέξτε διάστημα και πατήστε «Δημιουργία» ή «Εκτύπωση PDF».", size=12),
+                ft.Text("• Εργαλεία: Κάντε backup/restore σε JSON και διαχειριστείτε κατηγορίες.", size=12),
+                ft.Text("• Zoom: Κρατήστε Ctrl και γυρίστε τη ρόδα του ποντικιού για μεγέθυνση ή σμίκρυνση όλης της οθόνης.", size=12),
+                ft.Divider(height=12),
+                ft.Text("English", weight=ft.FontWeight.BOLD, size=14),
+                ft.Text("• Entries: Use Add for income or expenses, and click a row to edit it.", size=12),
+                ft.Text("• Reports: Pick a date range, then Generate or export a PDF.", size=12),
+                ft.Text("• Tools: Back up/restore JSON data and manage categories.", size=12),
+                ft.Text("• Zoom: Hold Ctrl and use the mouse wheel to scale the whole screen up or down.", size=12),
+            ], spacing=6, scroll=ft.ScrollMode.AUTO)
+        ),
+        actions=[ft.TextButton("OK", on_click=lambda e: close_subscription_dialog())],
+    )
+
+    def open_instructions(e):
+        page.show_dialog(instructions_dialog)
+
+    app_header = ft.Container(
+        padding=ft.padding.symmetric(horizontal=12, vertical=8),
+        bgcolor=ft.Colors.BLUE_50,
+        content=ft.Row([
+            ft.Row([
+                ft.Icon(ft.CupertinoIcons.MONEY_EURO_CIRCLE, color=ft.Colors.BLUE_700, size=22),
+                ft.Text("SubsPy", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_900),
+            ], spacing=8),
+            ft.Row([
+                zoom_status,
+                ft.IconButton(
+                    icon=ft.CupertinoIcons.QUESTION_CIRCLE,
+                    icon_color=ft.Colors.BLUE_700,
+                    tooltip="Οδηγίες / Instructions",
+                    on_click=open_instructions,
+                ),
+            ], spacing=4),
+        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+    )
+
+    def apply_zoom(delta: float):
+        nonlocal zoom_scale
+        next_scale = max(0.75, min(1.6, round(zoom_scale + delta, 2)))
+        if next_scale == zoom_scale:
+            return
+
+        zoom_scale = next_scale
+        zoom_status.value = f"{round(zoom_scale * 100)}%"
+        main_column.scale = ft.Scale(scale=zoom_scale, alignment=ft.Alignment(-1, -1))
+        page.update()
+
+    def on_zoom_scroll(e):
+        if not ctrl_pressed:
+            return
+
+        scroll_delta = getattr(e, "scroll_delta", None)
+        dy = getattr(scroll_delta, "y", 0) if scroll_delta else 0
+        apply_zoom(0.05 if dy < 0 else -0.05)
+
+    def on_key_down(e):
+        nonlocal ctrl_pressed
+        if is_control_key(getattr(e, "key", "")):
+            ctrl_pressed = True
+
+    def on_key_up(e):
+        nonlocal ctrl_pressed
+        if is_control_key(getattr(e, "key", "")):
+            ctrl_pressed = False
+
+    def on_page_keyboard(e):
+        nonlocal ctrl_pressed
+        ctrl_pressed = bool(getattr(e, "ctrl", False)) or is_control_key(getattr(e, "key", ""))
     
     def on_nav_change(e):
         selected_index = e.control.selected_index
@@ -818,30 +909,45 @@ def main(page: ft.Page):
         on_change=on_nav_change,
         destinations=[
             ft.NavigationBarDestination(
-                icon=ft.Icons.ACCOUNT_BALANCE_WALLET_OUTLINED,
-                selected_icon=ft.Icons.ACCOUNT_BALANCE_WALLET,
+                icon=ft.CupertinoIcons.MONEY_EURO_CIRCLE,
+                selected_icon=ft.CupertinoIcons.MONEY_EURO_CIRCLE_FILL,
                 label="Καταχωρήσεις",
             ),
             ft.NavigationBarDestination(
-                icon=ft.Icons.ASSESSMENT_OUTLINED,
-                selected_icon=ft.Icons.ASSESSMENT,
+                icon=ft.CupertinoIcons.CHART_BAR,
+                selected_icon=ft.CupertinoIcons.CHART_BAR_FILL,
                 label="Αναφορές",
             ),
             ft.NavigationBarDestination(
-                icon=ft.Icons.IMPORT_EXPORT,
+                icon=ft.CupertinoIcons.ARROW_UP_ARROW_DOWN,
                 label="Εργαλεία",
             ),
         ],
     )
+
+    main_column.controls = [
+        app_header,
+        content_container,
+        nav_bar,
+    ]
+    page.on_keyboard_event = on_page_keyboard
     
     # Main layout
     page.add(
         ft.SafeArea(
             expand=True,
-            content=ft.Column([
-                content_container,
-                nav_bar,
-            ], expand=True)
+            content=ft.Container(
+                expand=True,
+                content=ft.KeyboardListener(
+                    autofocus=True,
+                    on_key_down=on_key_down,
+                    on_key_up=on_key_up,
+                    content=ft.GestureDetector(
+                        on_scroll=on_zoom_scroll,
+                        content=main_column,
+                    ),
+                ),
+            )
         )
     )
     
