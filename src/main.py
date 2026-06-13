@@ -817,6 +817,7 @@ def main(page: ft.Page):
     content_container = ft.Container(expand=True, content=subscriptions_content)
     zoom_status = ft.Text("100%", size=12, color=ft.Colors.GREY_700)
     main_column = ft.Column(expand=True)
+    zoom_body = ft.Column(expand=True)
 
     instructions_dialog = ft.AlertDialog(
         modal=True,
@@ -874,7 +875,7 @@ def main(page: ft.Page):
 
         zoom_scale = next_scale
         zoom_status.value = f"{round(zoom_scale * 100)}%"
-        main_column.scale = ft.Scale(scale=zoom_scale, alignment=ft.Alignment(-1, -1))
+        zoom_body.scale = ft.Scale(scale=zoom_scale, alignment=ft.Alignment(-1, -1))
         page.update()
 
     def on_zoom_scroll(e):
@@ -925,9 +926,12 @@ def main(page: ft.Page):
         ],
     )
 
-    main_column.controls = [
+    zoom_body.controls = [
         app_header,
         content_container,
+    ]
+    main_column.controls = [
+        zoom_body,
         nav_bar,
     ]
     page.on_keyboard_event = on_page_keyboard
