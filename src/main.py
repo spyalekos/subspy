@@ -40,8 +40,8 @@ def main(page: ft.Page):
     zoom_scale = 1.0
     ctrl_pressed = False
     ZOOM_MIN = 0.75
-    ZOOM_MAX = 1.6
-    CATEGORY_SAFE_WIDTH = 760
+    ZOOM_MAX = 2.2
+    CATEGORY_SAFE_WIDTH = 910
     
     # ==================== HELPER FUNCTIONS ====================
     
@@ -342,14 +342,7 @@ def main(page: ft.Page):
         padding=10,
         expand=True,
         content=ft.Column([
-            ft.Row([
-                ft.Text("Καταχωρήσεις", size=20, weight=ft.FontWeight.BOLD),
-                ft.TextButton(
-                    "Προσθήκη",
-                    icon=ft.CupertinoIcons.PLUS,
-                    on_click=add_subscription_click
-                )
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+            ft.Text("Καταχωρήσεις", size=20, weight=ft.FontWeight.BOLD),
             ft.Container(height=10),
             ft.Container(
                 content=ft.Column([subscriptions_table], scroll=ft.ScrollMode.AUTO),
@@ -851,6 +844,14 @@ def main(page: ft.Page):
         page.show_dialog(instructions_dialog)
 
     zoom_controls = ft.Row([
+        ft.Button(
+            "Προσθήκη",
+            icon=ft.CupertinoIcons.PLUS,
+            bgcolor=ft.Colors.GREEN_600,
+            color=ft.Colors.WHITE,
+            icon_color=ft.Colors.WHITE,
+            on_click=add_subscription_click,
+        ),
         zoom_status,
         ft.IconButton(
             icon=ft.CupertinoIcons.QUESTION_CIRCLE,
