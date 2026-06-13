@@ -39,6 +39,9 @@ def main(page: ft.Page):
     report_to_date = datetime.now() + timedelta(days=30)
     zoom_scale = 1.0
     ctrl_pressed = False
+    ZOOM_MIN = 0.75
+    ZOOM_MAX = 1.6
+    CATEGORY_SAFE_WIDTH = 760
     
     # ==================== HELPER FUNCTIONS ====================
     
@@ -847,6 +850,16 @@ def main(page: ft.Page):
     def open_instructions(e):
         page.show_dialog(instructions_dialog)
 
+    zoom_controls = ft.Row([
+        zoom_status,
+        ft.IconButton(
+            icon=ft.CupertinoIcons.QUESTION_CIRCLE,
+            icon_color=ft.Colors.BLUE_700,
+            tooltip="Οδηγίες / Instructions",
+            on_click=open_instructions,
+        ),
+    ], spacing=4)
+
     app_header = ft.Container(
         padding=ft.padding.symmetric(horizontal=12, vertical=8),
         bgcolor=ft.Colors.BLUE_50,
@@ -854,29 +867,31 @@ def main(page: ft.Page):
             ft.Row([
                 ft.Icon(ft.CupertinoIcons.MONEY_EURO_CIRCLE, color=ft.Colors.BLUE_700, size=22),
                 ft.Text("SubsPy", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_900),
+                ft.Container(width=390),
+                zoom_controls,
             ], spacing=8),
-            ft.Row([
-                zoom_status,
-                ft.IconButton(
-                    icon=ft.CupertinoIcons.QUESTION_CIRCLE,
-                    icon_color=ft.Colors.BLUE_700,
-                    tooltip="Οδηγίες / Instructions",
-                    on_click=open_instructions,
-                ),
-            ], spacing=4),
-        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+        ], alignment=ft.MainAxisAlignment.START, scroll=ft.ScrollMode.AUTO),
     )
+
+    def get_max_zoom() -> float:
+        available_width = getattr(page, "width", None) or getattr(page.window, "width", None) or 1024
+        return max(1.0, min(ZOOM_MAX, available_width / CATEGORY_SAFE_WIDTH))
 
     def apply_zoom(delta: float):
         nonlocal zoom_scale
-        next_scale = max(0.75, min(1.6, round(zoom_scale + delta, 2)))
+        next_scale = max(ZOOM_MIN, min(get_max_zoom(), round(zoom_scale + delta, 2)))
         if next_scale == zoom_scale:
+            zoom_status.value = f"{round(zoom_scale * 100)}%"
+            page.update()
             return
 
         zoom_scale = next_scale
         zoom_status.value = f"{round(zoom_scale * 100)}%"
         zoom_body.scale = ft.Scale(scale=zoom_scale, alignment=ft.Alignment(-1, -1))
         page.update()
+
+    def clamp_zoom_to_window(e=None):
+        apply_zoom(0)
 
     def on_zoom_scroll(e):
         if not ctrl_pressed:
@@ -935,6 +950,7 @@ def main(page: ft.Page):
         nav_bar,
     ]
     page.on_keyboard_event = on_page_keyboard
+    page.window.on_event = clamp_zoom_to_window
     
     # Main layout
     page.add(
