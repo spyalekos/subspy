@@ -69,12 +69,14 @@ uv run python src/main.py
 - Πατήστε το εικονίδιο **?** στο επάνω μέρος για σύντομες οδηγίες στα Ελληνικά και Αγγλικά
 - Το **+ Προσθήκη** βρίσκεται στο επάνω control group, δίπλα στην ένδειξη zoom και στη βοήθεια
 - Κρατήστε πατημένο το `Ctrl` και γυρίστε τη ρόδα του ποντικιού για αναλογικό zoom. Το zoom σταματά πριν βγει εκτός οθόνης η περιοχή της στήλης «Κατηγορία».
+- Οι πίνακες Καταχωρήσεων και Αναφορών έχουν εμφανείς μπάρες κύλισης για οριζόντια και κάθετη πλοήγηση.
 
 ## English Quick Notes
 
 - Use the top **?** icon for built-in Greek/English instructions.
 - Use the green **Add** button in the top control group next to zoom and help.
 - Hold `Ctrl` and use the mouse wheel to scale the UI up or down. Zoom stops before the Category column area is pushed off screen.
+- Entries and Reports tables show scrollbars for horizontal and vertical navigation.
 
 ## Δομή έργου
 
@@ -138,6 +140,10 @@ uv run pyinstaller main.spec
 - [ReportLab](https://www.reportlab.com/) — Δημιουργία PDF
 
 ## Ιστορικό εκδόσεων
+
+**v4.05** — Ιούνιος 2026
+- Προστέθηκαν εμφανείς μπάρες κύλισης στους πίνακες Καταχωρήσεων και Αναφορών
+- Οι πίνακες τυλίγονται πλέον σε οριζόντιο και κάθετο scroll container
 
 **v4.04** — Ιούνιος 2026
 - Μεταφέρθηκε το **+ Προσθήκη** στο επάνω control group δίπλα στο zoom και τη βοήθεια, με πράσινο χρώμα

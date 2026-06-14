@@ -345,7 +345,9 @@ def main(page: ft.Page):
             ft.Text("Καταχωρήσεις", size=20, weight=ft.FontWeight.BOLD),
             ft.Container(height=10),
             ft.Container(
-                content=ft.Column([subscriptions_table], scroll=ft.ScrollMode.AUTO),
+                content=ft.Column([
+                    ft.Row([subscriptions_table], scroll=ft.ScrollMode.ALWAYS)
+                ], scroll=ft.ScrollMode.ALWAYS),
                 expand=True
             )
         ], expand=True)
@@ -542,7 +544,9 @@ def main(page: ft.Page):
             ft.Row([report_count_text, report_total_text], spacing=20),
             ft.Container(height=10),
             ft.Container(
-                content=ft.Column([report_table], scroll=ft.ScrollMode.AUTO),
+                content=ft.Column([
+                    ft.Row([report_table], scroll=ft.ScrollMode.ALWAYS)
+                ], scroll=ft.ScrollMode.ALWAYS),
                 expand=True
             )
         ], expand=True)
