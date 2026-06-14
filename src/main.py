@@ -889,7 +889,6 @@ def main(page: ft.Page):
         available_height = getattr(page, "height", None) or getattr(page.window, "height", None) or 720
         slot_height = max(MIN_ZOOM_BODY_HEIGHT, available_height - NAV_RESERVED_HEIGHT)
         zoom_body.height = slot_height / zoom_scale
-        zoom_body.width = (getattr(page, "width", None) or getattr(page.window, "width", None) or 1024) / zoom_scale
         zoom_body.scale = ft.Scale(scale=zoom_scale, alignment=ft.Alignment(-1, -1))
 
     def apply_zoom(delta: float):
