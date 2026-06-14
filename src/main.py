@@ -41,9 +41,6 @@ def main(page: ft.Page):
     ctrl_pressed = False
     ZOOM_MIN = 0.75
     ZOOM_MAX = 2.2
-    CATEGORY_SAFE_WIDTH = 910
-    NAV_RESERVED_HEIGHT = 90
-    MIN_ZOOM_BODY_HEIGHT = 260
     
     # ==================== HELPER FUNCTIONS ====================
     
@@ -66,6 +63,10 @@ def main(page: ft.Page):
         """Return True for common Flet/Flutter labels of the Ctrl key."""
         normalized = (key or "").lower()
         return "control" in normalized or normalized in {"ctrl", "controlleft", "controlright"}
+
+    def zoomed(value: float, minimum: int = 1) -> int:
+        """Scale layout values instead of using visual transforms."""
+        return max(minimum, round(value * zoom_scale))
     
     # ==================== ENTRY DIALOG ====================
     
@@ -293,6 +294,9 @@ def main(page: ft.Page):
         border=ft.Border.all(1, ft.Colors.GREY_300),
         border_radius=8,
         heading_row_color=ft.Colors.BLUE_50,
+        heading_row_height=56,
+        column_spacing=28,
+        data_row_min_height=44,
         data_row_max_height=50,
         show_checkbox_column=False,
     )
@@ -302,9 +306,11 @@ def main(page: ft.Page):
         if sub:
             open_subscription_dialog(sub)
     
-    def refresh_subscriptions():
+    def refresh_subscriptions(update_page: bool = True):
         subscriptions = db.get_all_subscriptions()
         subscriptions_table.rows.clear()
+        row_text_size = zoomed(14)
+        row_icon_size = zoomed(16)
         
         for sub in subscriptions:
             date_formatted = datetime.strptime(sub['charge_date'], '%Y-%m-%d').strftime('%d/%m/%Y')
@@ -324,18 +330,22 @@ def main(page: ft.Page):
             
             row = ft.DataRow(
                 cells=[
-                    ft.DataCell(ft.Text(sub['description'])),
-                    ft.DataCell(ft.Text(date_formatted)),
-                    ft.DataCell(ft.Text(f"{amount_prefix}€{sub['amount']:.2f}", color=amount_color, weight=ft.FontWeight.BOLD)),
-                    ft.DataCell(ft.Row([ft.Icon(type_icon, size=16, color=type_color), ft.Text(type_text, color=type_color)], spacing=2)),
-                    ft.DataCell(ft.Text(repeat_text)),
-                    ft.DataCell(ft.Text(sub['category'])),
+                    ft.DataCell(ft.Text(sub['description'], size=row_text_size)),
+                    ft.DataCell(ft.Text(date_formatted, size=row_text_size)),
+                    ft.DataCell(ft.Text(f"{amount_prefix}€{sub['amount']:.2f}", size=row_text_size, color=amount_color, weight=ft.FontWeight.BOLD)),
+                    ft.DataCell(ft.Row([
+                        ft.Icon(type_icon, size=row_icon_size, color=type_color),
+                        ft.Text(type_text, size=row_text_size, color=type_color),
+                    ], spacing=2)),
+                    ft.DataCell(ft.Text(repeat_text, size=row_text_size)),
+                    ft.DataCell(ft.Text(sub['category'], size=row_text_size)),
                 ],
                 on_select_change=lambda e, sid=sub['id']: on_row_click(sid)
             )
             subscriptions_table.rows.append(row)
         
-        page.update()
+        if update_page:
+            page.update()
     
     def add_subscription_click(e):
         open_subscription_dialog()
@@ -349,7 +359,7 @@ def main(page: ft.Page):
             ft.Container(
                 content=ft.Column([
                     ft.Row([subscriptions_table], scroll=ft.ScrollMode.ALWAYS)
-                ], scroll=ft.ScrollMode.ALWAYS),
+                ], expand=True, scroll=ft.ScrollMode.ALWAYS),
                 expand=True
             )
         ], expand=True)
@@ -374,6 +384,9 @@ def main(page: ft.Page):
         border=ft.Border.all(1, ft.Colors.GREY_300),
         border_radius=8,
         heading_row_color=ft.Colors.ORANGE_50,
+        heading_row_height=56,
+        data_row_min_height=44,
+        data_row_max_height=50,
         column_spacing=20,
     )
     
@@ -433,7 +446,7 @@ def main(page: ft.Page):
         date_picker_to.open = True
         page.update()
     
-    def refresh_report():
+    def refresh_report(update_page: bool = True):
         from_str = report_from_date.strftime("%Y-%m-%d")
         to_str = report_to_date.strftime("%Y-%m-%d")
         
@@ -441,6 +454,8 @@ def main(page: ft.Page):
         charges = db.get_progressive_charges(from_str, to_str)
         
         report_table.rows.clear()
+        row_text_size = zoomed(14)
+        row_icon_size = zoomed(16)
         
         running_balance = 0.0
         
@@ -474,13 +489,16 @@ def main(page: ft.Page):
             balance_prefix = "+" if running_balance >= 0 else "−"
             
             row = ft.DataRow(cells=[
-                ft.DataCell(ft.Text(date_formatted)),
-                ft.DataCell(ft.Text(charge['description'])),
-                ft.DataCell(ft.Row([ft.Icon(type_icon, size=16, color=type_color), ft.Text(type_text, color=type_color)], spacing=2)),
-                ft.DataCell(ft.Text(repeat_text)),
-                ft.DataCell(ft.Text(charge['category'])),
-                ft.DataCell(ft.Text(f"{amount_prefix}€{charge['amount']:.2f}", color=amount_color, weight=ft.FontWeight.BOLD)),
-                ft.DataCell(ft.Text(f"{balance_prefix}€{abs(running_balance):.2f}", color=balance_color, weight=ft.FontWeight.BOLD)),
+                ft.DataCell(ft.Text(date_formatted, size=row_text_size)),
+                ft.DataCell(ft.Text(charge['description'], size=row_text_size)),
+                ft.DataCell(ft.Row([
+                    ft.Icon(type_icon, size=row_icon_size, color=type_color),
+                    ft.Text(type_text, size=row_text_size, color=type_color),
+                ], spacing=2)),
+                ft.DataCell(ft.Text(repeat_text, size=row_text_size)),
+                ft.DataCell(ft.Text(charge['category'], size=row_text_size)),
+                ft.DataCell(ft.Text(f"{amount_prefix}€{charge['amount']:.2f}", size=row_text_size, color=amount_color, weight=ft.FontWeight.BOLD)),
+                ft.DataCell(ft.Text(f"{balance_prefix}€{abs(running_balance):.2f}", size=row_text_size, color=balance_color, weight=ft.FontWeight.BOLD)),
             ])
             report_table.rows.append(row)
         
@@ -492,7 +510,8 @@ def main(page: ft.Page):
             report_total_text.value = f"Τελικό Υπόλοιπο: −€{abs(running_balance):.2f}"
             report_total_text.color = ft.Colors.RED_700
         report_count_text.value = f"Κινήσεις: {len(charges)}"
-        page.update()
+        if update_page:
+            page.update()
     
     def generate_report_click(e):
         refresh_report()
@@ -548,7 +567,7 @@ def main(page: ft.Page):
             ft.Container(
                 content=ft.Column([
                     ft.Row([report_table], scroll=ft.ScrollMode.ALWAYS)
-                ], scroll=ft.ScrollMode.ALWAYS),
+                ], expand=True, scroll=ft.ScrollMode.ALWAYS),
                 expand=True
             )
         ], expand=True)
@@ -819,8 +838,6 @@ def main(page: ft.Page):
     content_container = ft.Container(expand=True, content=subscriptions_content)
     zoom_status = ft.Text("100%", size=12, color=ft.Colors.GREY_700)
     main_column = ft.Column(expand=True)
-    zoom_body = ft.Column()
-    zoom_slot = ft.Container(expand=True, clip_behavior=ft.ClipBehavior.HARD_EDGE)
 
     instructions_dialog = ft.AlertDialog(
         modal=True,
@@ -881,32 +898,38 @@ def main(page: ft.Page):
         ], alignment=ft.MainAxisAlignment.START, scroll=ft.ScrollMode.AUTO),
     )
 
-    def get_max_zoom() -> float:
-        available_width = getattr(page, "width", None) or getattr(page.window, "width", None) or 1024
-        return max(1.0, min(ZOOM_MAX, available_width / CATEGORY_SAFE_WIDTH))
+    def apply_table_zoom():
+        header_size = zoomed(14)
+        subscriptions_table.heading_row_height = zoomed(56)
+        subscriptions_table.data_row_min_height = zoomed(44)
+        subscriptions_table.data_row_max_height = zoomed(50)
+        subscriptions_table.column_spacing = zoomed(28)
+        report_table.heading_row_height = zoomed(56)
+        report_table.data_row_min_height = zoomed(44)
+        report_table.data_row_max_height = zoomed(50)
+        report_table.column_spacing = zoomed(20)
+        zoom_status.size = zoomed(12)
 
-    def update_zoom_body_geometry():
-        available_height = getattr(page, "height", None) or getattr(page.window, "height", None) or 720
-        slot_height = max(MIN_ZOOM_BODY_HEIGHT, available_height - NAV_RESERVED_HEIGHT)
-        zoom_body.height = slot_height / zoom_scale
-        zoom_body.scale = ft.Scale(scale=zoom_scale, alignment=ft.Alignment(-1, -1))
+        for table in (subscriptions_table, report_table):
+            for column in table.columns:
+                if isinstance(column.label, ft.Text):
+                    column.label.size = header_size
 
     def apply_zoom(delta: float):
         nonlocal zoom_scale
-        next_scale = max(ZOOM_MIN, min(get_max_zoom(), round(zoom_scale + delta, 2)))
+        next_scale = max(ZOOM_MIN, min(ZOOM_MAX, round(zoom_scale + delta, 2)))
         if next_scale == zoom_scale:
             zoom_status.value = f"{round(zoom_scale * 100)}%"
-            update_zoom_body_geometry()
             page.update()
             return
 
         zoom_scale = next_scale
         zoom_status.value = f"{round(zoom_scale * 100)}%"
-        update_zoom_body_geometry()
+        apply_table_zoom()
+        refresh_subscriptions(update_page=False)
+        if report_table.rows:
+            refresh_report(update_page=False)
         page.update()
-
-    def clamp_zoom_to_window(e=None):
-        apply_zoom(0)
 
     def on_zoom_scroll(e):
         if not ctrl_pressed:
@@ -956,18 +979,13 @@ def main(page: ft.Page):
         ],
     )
 
-    zoom_body.controls = [
+    main_column.controls = [
         app_header,
         content_container,
-    ]
-    zoom_slot.content = zoom_body
-    update_zoom_body_geometry()
-    main_column.controls = [
-        zoom_slot,
         nav_bar,
     ]
     page.on_keyboard_event = on_page_keyboard
-    page.window.on_event = clamp_zoom_to_window
+    apply_table_zoom()
     
     # Main layout
     page.add(
