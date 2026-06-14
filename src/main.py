@@ -42,6 +42,8 @@ def main(page: ft.Page):
     ZOOM_MIN = 0.75
     ZOOM_MAX = 2.2
     CATEGORY_SAFE_WIDTH = 910
+    NAV_RESERVED_HEIGHT = 90
+    MIN_ZOOM_BODY_HEIGHT = 260
     
     # ==================== HELPER FUNCTIONS ====================
     
@@ -817,7 +819,8 @@ def main(page: ft.Page):
     content_container = ft.Container(expand=True, content=subscriptions_content)
     zoom_status = ft.Text("100%", size=12, color=ft.Colors.GREY_700)
     main_column = ft.Column(expand=True)
-    zoom_body = ft.Column(expand=True)
+    zoom_body = ft.Column()
+    zoom_slot = ft.Container(expand=True, clip_behavior=ft.ClipBehavior.HARD_EDGE)
 
     instructions_dialog = ft.AlertDialog(
         modal=True,
@@ -882,17 +885,25 @@ def main(page: ft.Page):
         available_width = getattr(page, "width", None) or getattr(page.window, "width", None) or 1024
         return max(1.0, min(ZOOM_MAX, available_width / CATEGORY_SAFE_WIDTH))
 
+    def update_zoom_body_geometry():
+        available_height = getattr(page, "height", None) or getattr(page.window, "height", None) or 720
+        slot_height = max(MIN_ZOOM_BODY_HEIGHT, available_height - NAV_RESERVED_HEIGHT)
+        zoom_body.height = slot_height / zoom_scale
+        zoom_body.width = (getattr(page, "width", None) or getattr(page.window, "width", None) or 1024) / zoom_scale
+        zoom_body.scale = ft.Scale(scale=zoom_scale, alignment=ft.Alignment(-1, -1))
+
     def apply_zoom(delta: float):
         nonlocal zoom_scale
         next_scale = max(ZOOM_MIN, min(get_max_zoom(), round(zoom_scale + delta, 2)))
         if next_scale == zoom_scale:
             zoom_status.value = f"{round(zoom_scale * 100)}%"
+            update_zoom_body_geometry()
             page.update()
             return
 
         zoom_scale = next_scale
         zoom_status.value = f"{round(zoom_scale * 100)}%"
-        zoom_body.scale = ft.Scale(scale=zoom_scale, alignment=ft.Alignment(-1, -1))
+        update_zoom_body_geometry()
         page.update()
 
     def clamp_zoom_to_window(e=None):
@@ -950,8 +961,10 @@ def main(page: ft.Page):
         app_header,
         content_container,
     ]
+    zoom_slot.content = zoom_body
+    update_zoom_body_geometry()
     main_column.controls = [
-        zoom_body,
+        zoom_slot,
         nav_bar,
     ]
     page.on_keyboard_event = on_page_keyboard
