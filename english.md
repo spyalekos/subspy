@@ -66,6 +66,14 @@ To run the application, download the corresponding release executable (e.g., `su
 
 ## Version History
 
+**v5.0.0** — October 2026
+- Upgraded to Flet 1.0.5 and modernized dependencies.
+- Table columns now dynamically expand to occupy the full width of the screen.
+- Smooth mouse wheel zoom with `Ctrl` + wheel featuring rate-limiting and instant responsiveness.
+- Direct header zoom buttons (+ / - / click 100% to reset).
+- Permanently visible bottom horizontal scrollbar when zooming beyond 125%.
+- Enlarged instructions dialog (800px) with larger, easily readable typography.
+
 **v4.09** — July 2026
 - Fixed the padding `AttributeError` that prevented the compiled executable from running.
 - Locally excluded the `.agents` folder from the Git repository.

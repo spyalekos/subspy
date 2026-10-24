@@ -5,6 +5,7 @@ Compatible with Flet 0.80+
 """
 
 import flet as ft
+import asyncio
 from datetime import datetime, timedelta
 from typing import Optional
 import os
@@ -25,6 +26,13 @@ def main(page: ft.Page):
     
     # Set the window and app icon (looks in assets_dir)
     page.window.icon = "icon_new.png"
+    page.window.min_width = 800
+    page.window.min_height = 550
+    if not page.window.width or page.window.width < 950:
+        page.window.width = 1000
+    if not page.window.height or page.window.height < 650:
+        page.window.height = 700
+
     # Set Greek locale for DatePickers
     page.locale_configuration = ft.LocaleConfiguration(
         supported_locales=[ft.Locale("el", "GR")],
@@ -38,6 +46,8 @@ def main(page: ft.Page):
     report_from_date = datetime.now()
     report_to_date = datetime.now() + timedelta(days=30)
     zoom_scale = 1.0
+    target_zoom_scale = 1.0
+    zoom_task: Optional[asyncio.Future] = None
     ctrl_pressed = False
     ZOOM_MIN = 0.75
     ZOOM_MAX = 2.2
@@ -67,6 +77,168 @@ def main(page: ft.Page):
     def zoomed(value: float, minimum: int = 1) -> int:
         """Scale layout values instead of using visual transforms."""
         return max(minimum, round(value * zoom_scale))
+
+    def safe_show_dialog(dlg):
+        """Show a dialog safely avoiding 'Dialog is already opened' error."""
+        if dlg is None or getattr(dlg, "open", False):
+            return
+        try:
+            if hasattr(page, '_dialogs') and dlg in page._dialogs.controls:
+                page._dialogs.controls.remove(dlg)
+        except Exception:
+            pass
+        dlg.open = True
+        try:
+            page.show_dialog(dlg)
+        except Exception:
+            dlg.open = True
+            try:
+                dlg.update()
+            except Exception:
+                page.update()
+
+    def safe_close_dialog(dlg):
+        """Close a dialog safely by setting dlg.open=False and letting Flutter dismiss it."""
+        if dlg is None or not getattr(dlg, "open", False):
+            return
+        dlg.open = False
+        try:
+            dlg.update()
+        except Exception:
+            try:
+                page.pop_dialog()
+            except Exception:
+                pass
+
+    ZOOM_FIT_THRESHOLD = 1.25  # Up to 125% zoom, columns fit inside the window width
+
+    def get_column_widths_subscriptions():
+        """
+        Compute column widths:
+        - Up to ZOOM_FIT_THRESHOLD: columns dynamically fit 100% within the window width.
+        - Above ZOOM_FIT_THRESHOLD: table expands beyond window width, showing horizontal scrollbar.
+        """
+        avail = max(700, int(page.width or page.window.width or 950) - 36)
+        if zoom_scale <= ZOOM_FIT_THRESHOLD:
+            eff_width = avail
+        else:
+            eff_width = round(avail * (zoom_scale / ZOOM_FIT_THRESHOLD))
+
+        spacing = zoomed(16, minimum=8)
+        inner_width = max(580, eff_width - (5 * spacing) - 24)
+        
+        w_desc = round(inner_width * 0.28)
+        w_date = round(inner_width * 0.14)
+        w_amount = round(inner_width * 0.14)
+        w_type = round(inner_width * 0.14)
+        w_repeat = round(inner_width * 0.14)
+        w_cat = inner_width - (w_desc + w_date + w_amount + w_type + w_repeat)
+        return [w_desc, w_date, w_amount, w_type, w_repeat, w_cat], spacing, eff_width
+
+    def get_column_widths_report():
+        """
+        Compute report column widths:
+        - Up to ZOOM_FIT_THRESHOLD: columns dynamically fit 100% within the window width.
+        - Above ZOOM_FIT_THRESHOLD: table expands beyond window width, showing horizontal scrollbar.
+        """
+        avail = max(700, int(page.width or page.window.width or 950) - 36)
+        if zoom_scale <= ZOOM_FIT_THRESHOLD:
+            eff_width = avail
+        else:
+            eff_width = round(avail * (zoom_scale / ZOOM_FIT_THRESHOLD))
+
+        spacing = zoomed(14, minimum=6)
+        inner_width = max(580, eff_width - (6 * spacing) - 24)
+        
+        w_date = round(inner_width * 0.12)
+        w_desc = round(inner_width * 0.24)
+        w_type = round(inner_width * 0.12)
+        w_repeat = round(inner_width * 0.12)
+        w_cat = round(inner_width * 0.14)
+        w_amount = round(inner_width * 0.13)
+        w_bal = inner_width - (w_date + w_desc + w_type + w_repeat + w_cat + w_amount)
+        return [w_date, w_desc, w_type, w_repeat, w_cat, w_amount, w_bal], spacing, eff_width
+
+    zoom_status = ft.Text("100%", size=13, color=ft.Colors.GREY_700, weight=ft.FontWeight.BOLD)
+
+    def apply_table_zoom():
+        subscriptions_table.heading_row_height = zoomed(56)
+        subscriptions_table.data_row_min_height = zoomed(44)
+        subscriptions_table.data_row_max_height = zoomed(52)
+        report_table.heading_row_height = zoomed(56)
+        report_table.data_row_min_height = zoomed(44)
+        report_table.data_row_max_height = zoomed(52)
+        zoom_status.size = 13
+
+    def render_current_zoom():
+        apply_table_zoom()
+        refresh_subscriptions(update_page=False, force_reload=False)
+        if report_table.rows:
+            refresh_report(update_page=False)
+
+    async def _async_apply_zoom(target: float):
+        await asyncio.sleep(0.06)
+        nonlocal zoom_scale
+        if target == zoom_scale:
+            return
+        zoom_scale = target
+        zoom_status.value = f"{round(zoom_scale * 100)}%"
+        render_current_zoom()
+        page.update()
+
+    def apply_zoom(delta: float, immediate: bool = False):
+        nonlocal target_zoom_scale, zoom_task, zoom_scale
+        next_scale = max(ZOOM_MIN, min(ZOOM_MAX, round(target_zoom_scale + delta, 2)))
+        target_zoom_scale = next_scale
+        zoom_status.value = f"{round(target_zoom_scale * 100)}%"
+
+        if zoom_task and not zoom_task.done():
+            zoom_task.cancel()
+
+        if immediate:
+            zoom_scale = target_zoom_scale
+            render_current_zoom()
+            page.update()
+        else:
+            try:
+                zoom_status.update()
+            except Exception:
+                pass
+            zoom_task = page.run_task(_async_apply_zoom, target_zoom_scale)
+
+    last_scroll_time = 0.0
+
+    def on_zoom_scroll(e):
+        if not ctrl_pressed:
+            return
+
+        nonlocal last_scroll_time
+        import time
+        now = time.time()
+        # Drop excessive wheel events to keep the WebSocket buffer completely responsive
+        if now - last_scroll_time < 0.08:
+            return
+        last_scroll_time = now
+
+        scroll_delta = getattr(e, "scroll_delta", None)
+        dy = getattr(scroll_delta, "y", 0) if scroll_delta else 0
+        if dy == 0:
+            return
+        apply_zoom(0.10 if dy < 0 else -0.10, immediate=False)
+
+    def on_key_down(e):
+        nonlocal ctrl_pressed
+        if is_control_key(getattr(e, "key", "")):
+            ctrl_pressed = True
+
+    def on_key_up(e):
+        nonlocal ctrl_pressed
+        if is_control_key(getattr(e, "key", "")):
+            ctrl_pressed = False
+
+    def on_page_keyboard(e):
+        nonlocal ctrl_pressed
+        ctrl_pressed = bool(getattr(e, "ctrl", False)) or is_control_key(getattr(e, "key", ""))
     
     # ==================== ENTRY DIALOG ====================
     
@@ -126,8 +298,7 @@ def main(page: ft.Page):
     )
     
     def close_subscription_dialog(e=None):
-        page.pop_dialog()
-        page.update()
+        safe_close_dialog(subscription_dialog)
     
     def save_subscription(e):
         nonlocal selected_subscription_id, dlg_selected_date
@@ -154,18 +325,21 @@ def main(page: ft.Page):
         category = dlg_category.value or ""
         entry_type = list(dlg_entry_type.selected)[0] if dlg_entry_type.selected else "expense"
         
-        if selected_subscription_id:
-            db.update_subscription(
-                selected_subscription_id,
-                description, charge_date, amount, repeat_days, category, entry_type, repeat_mode
-            )
-            show_snackbar("Η καταχώρηση ενημερώθηκε!")
-        else:
-            db.add_subscription(description, charge_date, amount, repeat_days, category, entry_type, repeat_mode)
-            show_snackbar("Η καταχώρηση προστέθηκε!")
-        
-        close_subscription_dialog()
-        refresh_subscriptions()
+        try:
+            if selected_subscription_id:
+                db.update_subscription(
+                    selected_subscription_id,
+                    description, charge_date, amount, repeat_days, category, entry_type, repeat_mode
+                )
+                show_snackbar("Η καταχώρηση ενημερώθηκε!")
+            else:
+                db.add_subscription(description, charge_date, amount, repeat_days, category, entry_type, repeat_mode)
+                show_snackbar("Η καταχώρηση προστέθηκε!")
+            
+            close_subscription_dialog()
+            refresh_subscriptions()
+        except Exception as ex:
+            show_snackbar(f"Σφάλμα κατά την αποθήκευση: {ex}", error=True)
     
     def delete_subscription(e):
         nonlocal selected_subscription_id
@@ -247,7 +421,7 @@ def main(page: ft.Page):
     
     def open_subscription_dialog(subscription: Optional[dict] = None):
         nonlocal selected_subscription_id, dlg_selected_date
-        
+
         dlg_category.options = [ft.dropdown.Option(c) for c in get_categories_list()]
         
         if subscription:
@@ -277,40 +451,79 @@ def main(page: ft.Page):
             dlg_delete_button.visible = False
             subscription_dialog.title = ft.Text("Νέα Καταχώρηση")
         
-        page.show_dialog(subscription_dialog)
+        safe_show_dialog(subscription_dialog)
     
     # ==================== ENTRIES TAB CONTENT ====================
     
+    col_widths_sub, sub_spacing, sub_total_w = get_column_widths_subscriptions()
+
+    sub_col_desc_text = ft.Text("Περιγραφή", weight=ft.FontWeight.BOLD)
+    sub_col_date_text = ft.Text("Ημερομηνία", weight=ft.FontWeight.BOLD)
+    sub_col_amount_text = ft.Text("Ποσό (€)", weight=ft.FontWeight.BOLD)
+    sub_col_type_text = ft.Text("Τύπος", weight=ft.FontWeight.BOLD)
+    sub_col_repeat_text = ft.Text("Επανάληψη", weight=ft.FontWeight.BOLD)
+    sub_col_cat_text = ft.Text("Κατηγορία", weight=ft.FontWeight.BOLD)
+
+    sub_header_containers = [
+        ft.Container(content=sub_col_desc_text, width=col_widths_sub[0]),
+        ft.Container(content=sub_col_date_text, width=col_widths_sub[1]),
+        ft.Container(content=sub_col_amount_text, width=col_widths_sub[2], alignment=ft.Alignment(1, 0)),
+        ft.Container(content=sub_col_type_text, width=col_widths_sub[3]),
+        ft.Container(content=sub_col_repeat_text, width=col_widths_sub[4]),
+        ft.Container(content=sub_col_cat_text, width=col_widths_sub[5]),
+    ]
+
     subscriptions_table = ft.DataTable(
         columns=[
-            ft.DataColumn(ft.Text("Περιγραφή", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Ημερομηνία", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Ποσό (€)", weight=ft.FontWeight.BOLD), numeric=True),
-            ft.DataColumn(ft.Text("Τύπος", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Επανάληψη", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Κατηγορία", weight=ft.FontWeight.BOLD)),
+            ft.DataColumn(sub_header_containers[0]),
+            ft.DataColumn(sub_header_containers[1]),
+            ft.DataColumn(sub_header_containers[2], numeric=True),
+            ft.DataColumn(sub_header_containers[3]),
+            ft.DataColumn(sub_header_containers[4]),
+            ft.DataColumn(sub_header_containers[5]),
         ],
         rows=[],
         border=ft.Border.all(1, ft.Colors.GREY_300),
         border_radius=8,
         heading_row_color=ft.Colors.BLUE_50,
         heading_row_height=56,
-        column_spacing=28,
+        column_spacing=sub_spacing,
         data_row_min_height=44,
         data_row_max_height=50,
         show_checkbox_column=False,
     )
     
     def on_row_click(subscription_id: int):
+        if getattr(subscription_dialog, "open", False):
+            return
         sub = db.get_subscription_by_id(subscription_id)
         if sub:
             open_subscription_dialog(sub)
     
-    def refresh_subscriptions(update_page: bool = True):
-        subscriptions = db.get_all_subscriptions()
+    cached_subscriptions: list = []
+
+    def refresh_subscriptions(update_page: bool = True, force_reload: bool = True):
+        nonlocal cached_subscriptions
+        if force_reload or not cached_subscriptions:
+            cached_subscriptions = db.get_all_subscriptions()
+        subscriptions = cached_subscriptions
         subscriptions_table.rows.clear()
         row_text_size = zoomed(14)
         row_icon_size = zoomed(16)
+        col_w, sp, tot_w = get_column_widths_subscriptions()
+        
+        subscriptions_table.column_spacing = sp
+        subscriptions_table.width = tot_w
+        for i, cont in enumerate(sub_header_containers):
+            cont.width = col_w[i]
+        
+        header_text_size = zoomed(14)
+        sub_col_desc_text.size = header_text_size
+        sub_col_date_text.size = header_text_size
+        sub_col_amount_text.size = header_text_size
+        sub_col_type_text.size = header_text_size
+        sub_col_repeat_text.size = header_text_size
+        sub_col_cat_text.size = header_text_size
         
         for sub in subscriptions:
             date_formatted = datetime.strptime(sub['charge_date'], '%Y-%m-%d').strftime('%d/%m/%Y')
@@ -330,15 +543,34 @@ def main(page: ft.Page):
             
             row = ft.DataRow(
                 cells=[
-                    ft.DataCell(ft.Text(sub['description'], size=row_text_size)),
-                    ft.DataCell(ft.Text(date_formatted, size=row_text_size)),
-                    ft.DataCell(ft.Text(f"{amount_prefix}€{sub['amount']:.2f}", size=row_text_size, color=amount_color, weight=ft.FontWeight.BOLD)),
-                    ft.DataCell(ft.Row([
-                        ft.Icon(type_icon, size=row_icon_size, color=type_color),
-                        ft.Text(type_text, size=row_text_size, color=type_color),
-                    ], spacing=2)),
-                    ft.DataCell(ft.Text(repeat_text, size=row_text_size)),
-                    ft.DataCell(ft.Text(sub['category'], size=row_text_size)),
+                    ft.DataCell(ft.Container(
+                        content=ft.Text(sub['description'], size=row_text_size, overflow=ft.TextOverflow.ELLIPSIS),
+                        width=col_w[0]
+                    )),
+                    ft.DataCell(ft.Container(
+                        content=ft.Text(date_formatted, size=row_text_size),
+                        width=col_w[1]
+                    )),
+                    ft.DataCell(ft.Container(
+                        content=ft.Text(f"{amount_prefix}€{sub['amount']:.2f}", size=row_text_size, color=amount_color, weight=ft.FontWeight.BOLD),
+                        width=col_w[2],
+                        alignment=ft.Alignment(1, 0)
+                    )),
+                    ft.DataCell(ft.Container(
+                        content=ft.Row([
+                            ft.Icon(type_icon, size=row_icon_size, color=type_color),
+                            ft.Text(type_text, size=row_text_size, color=type_color),
+                        ], spacing=4),
+                        width=col_w[3]
+                    )),
+                    ft.DataCell(ft.Container(
+                        content=ft.Text(repeat_text, size=row_text_size),
+                        width=col_w[4]
+                    )),
+                    ft.DataCell(ft.Container(
+                        content=ft.Text(sub['category'], size=row_text_size, overflow=ft.TextOverflow.ELLIPSIS),
+                        width=col_w[5]
+                    )),
                 ],
                 on_select_change=lambda e, sid=sub['id']: on_row_click(sid)
             )
@@ -354,12 +586,17 @@ def main(page: ft.Page):
         padding=10,
         expand=True,
         content=ft.Column([
-            ft.Text("Καταχωρήσεις", size=20, weight=ft.FontWeight.BOLD),
-            ft.Container(height=10),
+            ft.Row([
+                ft.Text("Καταχωρήσεις", size=20, weight=ft.FontWeight.BOLD),
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+            ft.Container(height=6),
             ft.Container(
-                content=ft.Column([
-                    ft.Row([subscriptions_table], scroll=ft.ScrollMode.ALWAYS)
-                ], expand=True, scroll=ft.ScrollMode.ALWAYS),
+                content=ft.GestureDetector(
+                    on_scroll=on_zoom_scroll,
+                    content=ft.Row([
+                        ft.Column([subscriptions_table], scroll=ft.ScrollMode.AUTO)
+                    ], scroll=ft.ScrollMode.ALWAYS, expand=True),
+                ),
                 expand=True
             )
         ], expand=True)
@@ -370,15 +607,35 @@ def main(page: ft.Page):
     report_from_text = ft.Text(report_from_date.strftime("%d/%m/%Y"), size=14)
     report_to_text = ft.Text(report_to_date.strftime("%d/%m/%Y"), size=14)
     
+    col_widths_rep, rep_spacing, rep_total_w = get_column_widths_report()
+
+    rep_col_date_text = ft.Text("Ημερομηνία", weight=ft.FontWeight.BOLD)
+    rep_col_desc_text = ft.Text("Περιγραφή", weight=ft.FontWeight.BOLD)
+    rep_col_type_text = ft.Text("Τύπος", weight=ft.FontWeight.BOLD)
+    rep_col_repeat_text = ft.Text("Επανάληψη", weight=ft.FontWeight.BOLD)
+    rep_col_cat_text = ft.Text("Κατηγορία", weight=ft.FontWeight.BOLD)
+    rep_col_amount_text = ft.Text("Ποσό (€)", weight=ft.FontWeight.BOLD)
+    rep_col_bal_text = ft.Text("Υπόλοιπο", weight=ft.FontWeight.BOLD)
+
+    rep_header_containers = [
+        ft.Container(content=rep_col_date_text, width=col_widths_rep[0]),
+        ft.Container(content=rep_col_desc_text, width=col_widths_rep[1]),
+        ft.Container(content=rep_col_type_text, width=col_widths_rep[2]),
+        ft.Container(content=rep_col_repeat_text, width=col_widths_rep[3]),
+        ft.Container(content=rep_col_cat_text, width=col_widths_rep[4]),
+        ft.Container(content=rep_col_amount_text, width=col_widths_rep[5], alignment=ft.Alignment(1, 0)),
+        ft.Container(content=rep_col_bal_text, width=col_widths_rep[6], alignment=ft.Alignment(1, 0)),
+    ]
+
     report_table = ft.DataTable(
         columns=[
-            ft.DataColumn(ft.Text("Ημερομηνία", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Περιγραφή", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Τύπος", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Επανάληψη", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Κατηγορία", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Ποσό (€)", weight=ft.FontWeight.BOLD), numeric=True),
-            ft.DataColumn(ft.Text("Υπόλοιπο", weight=ft.FontWeight.BOLD), numeric=True),
+            ft.DataColumn(rep_header_containers[0]),
+            ft.DataColumn(rep_header_containers[1]),
+            ft.DataColumn(rep_header_containers[2]),
+            ft.DataColumn(rep_header_containers[3]),
+            ft.DataColumn(rep_header_containers[4]),
+            ft.DataColumn(rep_header_containers[5], numeric=True),
+            ft.DataColumn(rep_header_containers[6], numeric=True),
         ],
         rows=[],
         border=ft.Border.all(1, ft.Colors.GREY_300),
@@ -387,7 +644,7 @@ def main(page: ft.Page):
         heading_row_height=56,
         data_row_min_height=44,
         data_row_max_height=50,
-        column_spacing=20,
+        column_spacing=rep_spacing,
     )
     
     report_total_text = ft.Text("Σύνολο: €0.00", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.YELLOW_700)
@@ -456,6 +713,20 @@ def main(page: ft.Page):
         report_table.rows.clear()
         row_text_size = zoomed(14)
         row_icon_size = zoomed(16)
+        col_w, sp, tot_w = get_column_widths_report()
+        report_table.column_spacing = sp
+        report_table.width = tot_w
+        for i, cont in enumerate(rep_header_containers):
+            cont.width = col_w[i]
+
+        header_text_size = zoomed(14)
+        rep_col_date_text.size = header_text_size
+        rep_col_desc_text.size = header_text_size
+        rep_col_type_text.size = header_text_size
+        rep_col_repeat_text.size = header_text_size
+        rep_col_cat_text.size = header_text_size
+        rep_col_amount_text.size = header_text_size
+        rep_col_bal_text.size = header_text_size
         
         running_balance = 0.0
         
@@ -489,16 +760,16 @@ def main(page: ft.Page):
             balance_prefix = "+" if running_balance >= 0 else "−"
             
             row = ft.DataRow(cells=[
-                ft.DataCell(ft.Text(date_formatted, size=row_text_size)),
-                ft.DataCell(ft.Text(charge['description'], size=row_text_size)),
-                ft.DataCell(ft.Row([
+                ft.DataCell(ft.Container(content=ft.Text(date_formatted, size=row_text_size), width=col_w[0])),
+                ft.DataCell(ft.Container(content=ft.Text(charge['description'], size=row_text_size, overflow=ft.TextOverflow.ELLIPSIS), width=col_w[1])),
+                ft.DataCell(ft.Container(content=ft.Row([
                     ft.Icon(type_icon, size=row_icon_size, color=type_color),
                     ft.Text(type_text, size=row_text_size, color=type_color),
-                ], spacing=2)),
-                ft.DataCell(ft.Text(repeat_text, size=row_text_size)),
-                ft.DataCell(ft.Text(charge['category'], size=row_text_size)),
-                ft.DataCell(ft.Text(f"{amount_prefix}€{charge['amount']:.2f}", size=row_text_size, color=amount_color, weight=ft.FontWeight.BOLD)),
-                ft.DataCell(ft.Text(f"{balance_prefix}€{abs(running_balance):.2f}", size=row_text_size, color=balance_color, weight=ft.FontWeight.BOLD)),
+                ], spacing=4), width=col_w[2])),
+                ft.DataCell(ft.Container(content=ft.Text(repeat_text, size=row_text_size), width=col_w[3])),
+                ft.DataCell(ft.Container(content=ft.Text(charge['category'], size=row_text_size, overflow=ft.TextOverflow.ELLIPSIS), width=col_w[4])),
+                ft.DataCell(ft.Container(content=ft.Text(f"{amount_prefix}€{charge['amount']:.2f}", size=row_text_size, color=amount_color, weight=ft.FontWeight.BOLD), width=col_w[5], alignment=ft.Alignment(1, 0))),
+                ft.DataCell(ft.Container(content=ft.Text(f"{balance_prefix}€{abs(running_balance):.2f}", size=row_text_size, color=balance_color, weight=ft.FontWeight.BOLD), width=col_w[6], alignment=ft.Alignment(1, 0))),
             ])
             report_table.rows.append(row)
         
@@ -512,7 +783,7 @@ def main(page: ft.Page):
         report_count_text.value = f"Κινήσεις: {len(charges)}"
         if update_page:
             page.update()
-    
+
     def generate_report_click(e):
         refresh_report()
     
@@ -565,9 +836,12 @@ def main(page: ft.Page):
             ft.Row([report_count_text, report_total_text], spacing=20),
             ft.Container(height=10),
             ft.Container(
-                content=ft.Column([
-                    ft.Row([report_table], scroll=ft.ScrollMode.ALWAYS)
-                ], expand=True, scroll=ft.ScrollMode.ALWAYS),
+                content=ft.GestureDetector(
+                    on_scroll=on_zoom_scroll,
+                    content=ft.Row([
+                        ft.Column([report_table], scroll=ft.ScrollMode.AUTO)
+                    ], scroll=ft.ScrollMode.ALWAYS, expand=True),
+                ),
                 expand=True
             )
         ], expand=True)
@@ -836,36 +1110,56 @@ def main(page: ft.Page):
     
     tab_contents = [subscriptions_content, reports_content, import_export_content]
     content_container = ft.Container(expand=True, content=subscriptions_content)
-    zoom_status = ft.Text("100%", size=12, color=ft.Colors.GREY_700)
     main_column = ft.Column(expand=True)
 
     instructions_dialog = ft.AlertDialog(
         modal=True,
         title=ft.Row([
-            ft.Icon(ft.CupertinoIcons.QUESTION_CIRCLE, color=ft.Colors.BLUE_700),
-            ft.Text("Οδηγίες / Instructions", weight=ft.FontWeight.BOLD),
-        ], spacing=8),
+            ft.Icon(ft.CupertinoIcons.QUESTION_CIRCLE, color=ft.Colors.BLUE_700, size=28),
+            ft.Text("Οδηγίες Χρήσης / Instructions", weight=ft.FontWeight.BOLD, size=22),
+        ], spacing=12),
         content=ft.Container(
-            width=520,
+            width=800,
+            padding=ft.Padding.symmetric(horizontal=12, vertical=10),
             content=ft.Column([
-                ft.Text("Ελληνικά", weight=ft.FontWeight.BOLD, size=14),
-                ft.Text("• Καταχωρήσεις: Πατήστε «Προσθήκη» για έσοδα ή έξοδα και πατήστε σε γραμμή για επεξεργασία.", size=12),
-                ft.Text("• Αναφορές: Επιλέξτε διάστημα και πατήστε «Δημιουργία» ή «Εκτύπωση PDF».", size=12),
-                ft.Text("• Εργαλεία: Κάντε backup/restore σε JSON και διαχειριστείτε κατηγορίες.", size=12),
-                ft.Text("• Zoom: Κρατήστε Ctrl και γυρίστε τη ρόδα του ποντικιού για μεγέθυνση ή σμίκρυνση όλης της οθόνης.", size=12),
-                ft.Divider(height=12),
-                ft.Text("English", weight=ft.FontWeight.BOLD, size=14),
-                ft.Text("• Entries: Use Add for income or expenses, and click a row to edit it.", size=12),
-                ft.Text("• Reports: Pick a date range, then Generate or export a PDF.", size=12),
-                ft.Text("• Tools: Back up/restore JSON data and manage categories.", size=12),
-                ft.Text("• Zoom: Hold Ctrl and use the mouse wheel to scale the whole screen up or down.", size=12),
-            ], spacing=6, scroll=ft.ScrollMode.AUTO)
+                ft.Text("Ελληνικά", weight=ft.FontWeight.BOLD, size=18, color=ft.Colors.BLUE_900),
+                ft.Text("• Καταχωρήσεις: Πατήστε «Προσθήκη» για έσοδα ή έξοδα και πατήστε σε οποιαδήποτε γραμμή του πίνακα για επεξεργασία ή διαγραφή.", size=16),
+                ft.Text("• Αναφορές: Επιλέξτε διάστημα ημερομηνιών και πατήστε «Δημιουργία» για προβολή κινήσεων και υπολοίπων ή «Εκτύπωση PDF».", size=16),
+                ft.Text("• Εργαλεία: Δημιουργήστε αντίγραφα ασφαλείας σε αρχείο JSON, κάντε ανάκτηση (restore) και διαχειριστείτε κατηγορίες.", size=16),
+                ft.Text("• Zoom: Κρατήστε πατημένο το πλήκτρο Ctrl και γυρίστε τη ρόδα του ποντικιού για μεγέθυνση ή σμίκρυνση, ή χρησιμοποιήστε τα κουμπιά [+] και [-] στην κεφαλίδα (κλικ στο ποσοστό για επαναφορά στο 100%).", size=16),
+                ft.Divider(height=22),
+                ft.Text("English", weight=ft.FontWeight.BOLD, size=18, color=ft.Colors.BLUE_900),
+                ft.Text("• Entries: Click 'Add' for income or expenses, and click any table row to edit or delete it.", size=16),
+                ft.Text("• Reports: Select date range and click 'Generate' to view progressive balances, or 'Export PDF'.", size=16),
+                ft.Text("• Tools: Export/import JSON backups and manage transaction categories.", size=16),
+                ft.Text("• Zoom: Hold Ctrl and rotate the mouse wheel to scale up or down, or use the [+] and [-] buttons in the header (click percentage to reset to 100%).", size=16),
+            ], spacing=12, scroll=ft.ScrollMode.AUTO)
         ),
-        actions=[ft.TextButton("OK", on_click=lambda e: close_subscription_dialog())],
+        actions=[
+            ft.TextButton(
+                "OK",
+                icon=ft.CupertinoIcons.CHECKMARK,
+                style=ft.ButtonStyle(color=ft.Colors.BLUE_700),
+                on_click=lambda e: safe_close_dialog(instructions_dialog)
+            )
+        ],
     )
 
     def open_instructions(e):
-        page.show_dialog(instructions_dialog)
+        safe_show_dialog(instructions_dialog)
+
+    def zoom_in_click(e):
+        apply_zoom(0.10, immediate=True)
+
+    def zoom_out_click(e):
+        apply_zoom(-0.10, immediate=True)
+
+    def zoom_reset_click(e):
+        nonlocal target_zoom_scale, zoom_task
+        if zoom_task and not zoom_task.done():
+            zoom_task.cancel()
+        target_zoom_scale = 1.0
+        apply_zoom(0, immediate=True)
 
     zoom_controls = ft.Row([
         ft.Button(
@@ -876,82 +1170,54 @@ def main(page: ft.Page):
             icon_color=ft.Colors.WHITE,
             on_click=add_subscription_click,
         ),
-        zoom_status,
+        ft.Row([
+            ft.IconButton(
+                icon=ft.CupertinoIcons.MINUS_CIRCLE,
+                icon_color=ft.Colors.BLUE_700,
+                tooltip="Σμίκρυνση (Ctrl + Ρόδα προς τα κάτω)",
+                on_click=zoom_out_click,
+                icon_size=18,
+            ),
+            ft.Container(
+                content=zoom_status,
+                tooltip="Επαναφορά στο 100% (Κλικ)",
+                on_click=zoom_reset_click,
+                padding=ft.Padding.symmetric(horizontal=6, vertical=2),
+                border=ft.Border.all(1, ft.Colors.BLUE_200),
+                border_radius=4,
+                bgcolor=ft.Colors.WHITE,
+            ),
+            ft.IconButton(
+                icon=ft.CupertinoIcons.PLUS_CIRCLE,
+                icon_color=ft.Colors.BLUE_700,
+                tooltip="Μεγέθυνση (Ctrl + Ρόδα προς τα επάνω)",
+                on_click=zoom_in_click,
+                icon_size=18,
+            ),
+        ], spacing=2, alignment=ft.MainAxisAlignment.CENTER),
         ft.IconButton(
             icon=ft.CupertinoIcons.QUESTION_CIRCLE,
             icon_color=ft.Colors.BLUE_700,
             tooltip="Οδηγίες / Instructions",
             on_click=open_instructions,
+            icon_size=20,
         ),
-    ], spacing=4)
+    ], spacing=8, alignment=ft.MainAxisAlignment.END)
 
     app_header = ft.Container(
-        padding=ft.Padding.symmetric(horizontal=12, vertical=8),
+        padding=ft.Padding.symmetric(horizontal=16, vertical=8),
         bgcolor=ft.Colors.BLUE_50,
+        border=ft.Border(bottom=ft.BorderSide(1, ft.Colors.BLUE_100)),
         content=ft.Row([
             ft.Row([
-                ft.Icon(ft.CupertinoIcons.MONEY_EURO_CIRCLE, color=ft.Colors.BLUE_700, size=22),
-                ft.Text("SubsPy", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_900),
-                ft.Container(width=390),
-                zoom_controls,
+                ft.Icon(ft.CupertinoIcons.MONEY_EURO_CIRCLE, color=ft.Colors.BLUE_700, size=24),
+                ft.Text("SubsPy", size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_900),
             ], spacing=8),
-        ], alignment=ft.MainAxisAlignment.START, scroll=ft.ScrollMode.AUTO),
+            zoom_controls,
+        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
     )
 
-    def apply_table_zoom():
-        header_size = zoomed(14)
-        subscriptions_table.heading_row_height = zoomed(56)
-        subscriptions_table.data_row_min_height = zoomed(44)
-        subscriptions_table.data_row_max_height = zoomed(50)
-        subscriptions_table.column_spacing = zoomed(28)
-        report_table.heading_row_height = zoomed(56)
-        report_table.data_row_min_height = zoomed(44)
-        report_table.data_row_max_height = zoomed(50)
-        report_table.column_spacing = zoomed(20)
-        zoom_status.size = zoomed(12)
 
-        for table in (subscriptions_table, report_table):
-            for column in table.columns:
-                if isinstance(column.label, ft.Text):
-                    column.label.size = header_size
-
-    def apply_zoom(delta: float):
-        nonlocal zoom_scale
-        next_scale = max(ZOOM_MIN, min(ZOOM_MAX, round(zoom_scale + delta, 2)))
-        if next_scale == zoom_scale:
-            zoom_status.value = f"{round(zoom_scale * 100)}%"
-            page.update()
-            return
-
-        zoom_scale = next_scale
-        zoom_status.value = f"{round(zoom_scale * 100)}%"
-        apply_table_zoom()
-        refresh_subscriptions(update_page=False)
-        if report_table.rows:
-            refresh_report(update_page=False)
-        page.update()
-
-    def on_zoom_scroll(e):
-        if not ctrl_pressed:
-            return
-
-        scroll_delta = getattr(e, "scroll_delta", None)
-        dy = getattr(scroll_delta, "y", 0) if scroll_delta else 0
-        apply_zoom(0.05 if dy < 0 else -0.05)
-
-    def on_key_down(e):
-        nonlocal ctrl_pressed
-        if is_control_key(getattr(e, "key", "")):
-            ctrl_pressed = True
-
-    def on_key_up(e):
-        nonlocal ctrl_pressed
-        if is_control_key(getattr(e, "key", "")):
-            ctrl_pressed = False
-
-    def on_page_keyboard(e):
-        nonlocal ctrl_pressed
-        ctrl_pressed = bool(getattr(e, "ctrl", False)) or is_control_key(getattr(e, "key", ""))
     
     def on_nav_change(e):
         selected_index = e.control.selected_index
@@ -984,6 +1250,23 @@ def main(page: ft.Page):
         content_container,
         nav_bar,
     ]
+    resize_task: Optional[asyncio.Future] = None
+
+    async def _async_resize():
+        await asyncio.sleep(0.05)
+        try:
+            render_current_zoom()
+            page.update()
+        except Exception:
+            pass
+
+    def on_page_resize(e):
+        nonlocal resize_task
+        if resize_task and not resize_task.done():
+            resize_task.cancel()
+        resize_task = page.run_task(_async_resize)
+
+    page.on_resize = on_page_resize
     page.on_keyboard_event = on_page_keyboard
     apply_table_zoom()
     
