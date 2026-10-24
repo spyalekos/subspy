@@ -66,6 +66,10 @@ To run the application, download the corresponding release executable (e.g., `su
 
 ## Version History
 
+**v5.0.2** — October 2026
+- Clean, text-free splash screen and refreshed currency bicycle icon (€ / $ wheels).
+- New standalone release executable featuring the updated splash screen.
+
 **v5.0.1** — October 2026
 - New application icon and branding featuring a currency bicycle with Euro (€) and Dollar ($) wheels.
 - Added visual splash screen during application launch.
