@@ -18,6 +18,7 @@ from version import VERSION
 APP_VERSION = VERSION
 
 
+
 def main(page: ft.Page):
     """Main application entry point."""
     page.title = f"SubsPy - Διαχείριση Εσόδων & Εξόδων v{APP_VERSION}"
@@ -25,7 +26,7 @@ def main(page: ft.Page):
     page.padding = 0
     
     # Set the window and app icon (looks in assets_dir)
-    page.window.icon = "icon_new.png"
+    page.window.icon = "icon.ico"
     page.window.min_width = 800
     page.window.min_height = 550
     if not page.window.width or page.window.width < 950:
@@ -1210,7 +1211,7 @@ def main(page: ft.Page):
         border=ft.Border(bottom=ft.BorderSide(1, ft.Colors.BLUE_100)),
         content=ft.Row([
             ft.Row([
-                ft.Icon(ft.CupertinoIcons.MONEY_EURO_CIRCLE, color=ft.Colors.BLUE_700, size=24),
+                ft.Image(src="icon_new.png", width=28, height=28, fit=ft.BoxFit.CONTAIN, border_radius=4),
                 ft.Text("SubsPy", size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_900),
             ], spacing=8),
             zoom_controls,
@@ -1292,6 +1293,13 @@ def main(page: ft.Page):
     # Initial load
     refresh_subscriptions()
     refresh_categories_list()
+    page.update()
+
+    try:
+        import pyi_splash
+        pyi_splash.close()
+    except ImportError:
+        pass
 
 
 ft.run(main)

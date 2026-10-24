@@ -66,6 +66,11 @@ To run the application, download the corresponding release executable (e.g., `su
 
 ## Version History
 
+**v5.0.1** — October 2026
+- New application icon and branding featuring a currency bicycle with Euro (€) and Dollar ($) wheels.
+- Added visual splash screen during application launch.
+- Built and published standalone release executable with integrated bootloader splash.
+
 **v5.0.0** — October 2026
 - Upgraded to Flet 1.0.5 and modernized dependencies.
 - Table columns now dynamically expand to occupy the full width of the screen.

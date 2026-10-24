@@ -1,6 +1,6 @@
 [project]
 name = "subspy"
-version = "5.0.0"
+version = "5.0.1"
 description = "Εφαρμογή Διαχείρισης Εσόδων & Εξόδων - Income/Expense Management App"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,6 +16,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "flet[all]>=0.80.1",
+    "pyinstaller>=6.22.3",
 ]
 
 [tool.flet]
